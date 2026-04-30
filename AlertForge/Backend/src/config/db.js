@@ -1,9 +1,14 @@
 import mongoose from "mongoose";
-import { config } from "./config.js";
+import appConfig from "./appConfig.js";
 
 const connectDB = async () => {
-    await mongoose.connect(config.MONGO_URI);
-    console.log("MongoDB connected");
+    try {
+        await mongoose.connect(appConfig.mongoURI);
+        console.log("MongoDB connected");
+    } catch (error) {
+        console.error("DB connection failed:", error.message);
+        process.exit(1);
+    }
 };
 
 export default connectDB;
