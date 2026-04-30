@@ -6,6 +6,6 @@ import { createIncident } from "../controller/incident.controller.js";
 
 const incidentRouter = express.Router();
 
-incidentRouter.post("/incident", validateApiKey, createIncident);
+incidentRouter.post("/", validateApiKey, createIncident);
 
 export default incidentRouter;
