@@ -1,5 +1,12 @@
 import app from "./src/app.js";
+import appConfig from "./src/config/appConfig.js";
+import connectDB from "./src/config/db.js";
 
-app.listen(3000, (req, res) => {
-    console.log("Server is running on port 3000")
+
+connectDB()
+
+
+
+app.listen(appConfig.port, (req, res) => {
+    console.log(`Server is running on port ${appConfig.port}`)
 })

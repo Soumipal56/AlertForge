@@ -1,17 +1,16 @@
-import ApiError from "../utils/ApiError";
+import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants";
 
 export const errorHandler = (err, req, res, next) => {
     console.error(err); // Log the error for debugging  
 
-    if (err instanceof ApiError) {
+    if (err.statusCode) {
         return res.status(err.statusCode).json({
             success: false,
             message: err.message,
-        });    
-    } else {
-        return res.status(500).json({
-            success: false,
-            message: "Internal Server Error",
         });
     }
+    return res.status(HTTP_STATUS.INTERNAL_SERVER).json({
+        success: false,
+        message: ERROR_MESSAGES.GENERAL.INTERNAL_SERVER,
+    });
 };
