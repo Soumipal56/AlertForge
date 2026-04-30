@@ -43,12 +43,6 @@
   src: url("/fonts/Geist/Geist-ExtraLight.ttf") format("truetype");
 }
 
-@font-face {
-  font-family: "geist-light";
-  src: url("/fonts/Geist/Geist-Light.ttf") format("truetype");
-}
-
-
 
 @custom-variant dark (&:is(.dark *));
 

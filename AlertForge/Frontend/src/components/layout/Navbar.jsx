@@ -185,9 +185,7 @@ function Navbar() {
         },
       ],
     },
-    { id: 4, label: "Enterprise", link: "#" },
     { id: 5, label: "Docs", link: "#" },
-    { id: 6, label: "Pricing", link: "#" },
   ];
   const [menuOpen, setMenuOpen] = useState(false);
 
