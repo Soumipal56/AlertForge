@@ -5,6 +5,7 @@ import { incidentSchema } from "../validators/incident.validator.js";
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from "../config/constants.js";
 import { sendIncidentNotification } from "../services/notification/notification.service.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
+import { createTimelineEventService } from "../services/timeline/timeline.service.js";
 
 const buildIncidentSocketPayload = (incident) => ({
     id: incident?._id?.toString?.() || incident?.id || null,
@@ -14,6 +15,19 @@ const buildIncidentSocketPayload = (incident) => ({
     createdAt: incident?.createdAt,
     updatedAt: incident?.updatedAt,
 });
+
+const saveTimelineEntry = async (type, incident, message = "") => {
+    // Save timeline event after incident changes so the activity feed survives refreshes.
+    try {
+        await createTimelineEventService({
+            type,
+            incidentId: incident?._id?.toString?.() || incident?.id,
+            message,
+        });
+    } catch (error) {
+        console.error("[Timeline] Failed to persist timeline entry:", error.message);
+    }
+};
 
 /**  
  * @description Controller function to create a new incident
@@ -38,6 +52,7 @@ export const createIncident = async (req, res, next) => {
         }
 
         const incident = await createIncidentService(data);
+        await saveTimelineEntry("incident.created", incident, incident?.message || "");
         //NOTE - for making our api faster we are sending email notification in the background without waiting for it to complete. 
         //! This is a fire-and-forget approach. If we want to ensure that the email is sent before responding, we can await this function, but it will increase the response time of our API.
         sendIncidentNotification(incident);
@@ -133,6 +148,7 @@ export const updateIncidentStatus = async (req, res, next) => {
             throw new ApiError(404, "Incident not found");
         }
 
+        await saveTimelineEntry("incident.status_changed", updated, `Status changed to ${updated.status}`);
         emitIncidentUpdate(updated);
         emitTimelineEvent({
             type: "incident.status_changed",

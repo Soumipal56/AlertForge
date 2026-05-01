@@ -5,13 +5,11 @@ import {
     getRecentWarRoomMessages,
     resolveWarRoomIdFromApiKey,
     saveWarRoomMessage,
+    validateWarRoomMessage,
 } from "../services/warroom/warRoomChat.service.js";
+import { addUser, getCount, removeUser, getRoomsForSocket } from "../services/socket/presence.service.js";
 
 let ioInstance = null;
-
-// In-memory presence map:
-// roomId -> Set of connected socket IDs currently joined to that room.
-const roomPresence = new Map();
 
 /**
  * Normalizes any room input so we always store and compare room names
@@ -43,33 +41,13 @@ const toMessagePayload = (message) => ({
 });
 
 /**
- * Adds a socket to the presence map for a room and returns the new count.
- * @param {string} socketId
- * @param {string} room
- * @returns {number}
+ * Emits a standardized socket error event for runtime validation issues.
+ * @param {import("socket.io").Socket} socket
+ * @param {string} type
+ * @param {string} message
  */
-const addPresence = (socketId, room) => {
-    if (!roomPresence.has(room)) {
-        roomPresence.set(room, new Set());
-    }
-
-    roomPresence.get(room).add(socketId);
-    return roomPresence.get(room).size;
-};
-
-/**
- * Removes a socket from the presence map for a room and returns the new count.
- * @param {string} socketId
- * @param {string} room
- * @returns {number}
- */
-const removePresence = (socketId, room) => {
-    if (!roomPresence.has(room)) {
-        return 0;
-    }
-
-    roomPresence.get(room).delete(socketId);
-    return roomPresence.get(room).size;
+const emitSocketError = (socket, type, message) => {
+    socket.emit("error:event", { type, message });
 };
 
 /**
@@ -81,7 +59,7 @@ const removePresence = (socketId, room) => {
 export const initSocket = (httpServer) => {
     ioInstance = new Server(httpServer, {
         cors: {
-            origin: "http://localhost:5173",
+            origin: process.env.CLIENT_URL || "http://localhost:5173",
             methods: ["GET", "POST"],
         },
     });
@@ -117,66 +95,24 @@ export const initSocket = (httpServer) => {
     ioInstance.on("connection", (socket) => {
         console.log(`[Socket] Connected: ${socket.id} (key: ${socket.data.apiKey?.name || "unnamed"})`);
 
-        // Existing room join path kept for compatibility with the current app.
-        socket.on("join_room", (roomName, ack) => {
-            const room = normalizeRoomName(roomName);
-
-            if (!room) {
-                if (typeof ack === "function") ack({ success: false, message: "Room name is required" });
-                return;
-            }
-
-            socket.join(room);
-            socket.data.activeRoom = room;
-
-            const count = addPresence(socket.id, room);
-            ioInstance.to(room).emit("room:presence", { room, count });
-
-            if (typeof ack === "function") {
-                ack({ success: true, room, count });
-            }
-        });
-
-        socket.on("leave_room", (roomName, ack) => {
-            const room = normalizeRoomName(roomName);
-
-            if (!room) {
-                if (typeof ack === "function") ack({ success: false, message: "Room name is required" });
-                return;
-            }
-
-            socket.leave(room);
-
-            if (socket.data.activeRoom === room) {
-                socket.data.activeRoom = "";
-            }
-
-            const count = removePresence(socket.id, room);
-            ioInstance.to(room).emit("room:presence", { room, count });
-
-            if (typeof ack === "function") {
-                ack({ success: true, room, count });
-            }
-        });
-
         // Explicit War Room entry point.
         // We resolve the room from the API key so the client does not need to
         // pass an extra identifier or authentication payload.
-        socket.on("join_warroom", async (_payload, ack) => {
+        const handleJoinWarroom = async (_payload, ack) => {
             try {
-                const room = resolveWarRoomIdFromApiKey(socket.data.apiKey);
+                const room = normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
 
                 if (!room) {
                     const message = "War room could not be resolved from API key";
                     if (typeof ack === "function") ack({ success: false, message });
-                    socket.emit("chat:error", { message });
+                    emitSocketError(socket, "AUTH_ERROR", message);
                     return;
                 }
 
                 socket.join(room);
                 socket.data.warRoom = room;
 
-                const count = addPresence(socket.id, room);
+                const count = addUser(room, socket.id);
                 const recentMessages = await getRecentWarRoomMessages(room);
 
                 ioInstance.to(room).emit("room:presence", { room, count });
@@ -194,46 +130,49 @@ export const initSocket = (httpServer) => {
             } catch (error) {
                 const message = error?.message || "Failed to join war room";
                 if (typeof ack === "function") ack({ success: false, message });
-                socket.emit("chat:error", { message });
+                emitSocketError(socket, "VALIDATION_ERROR", message);
             }
-        });
+        };
+
+        socket.on("join_warroom", handleJoinWarroom);
 
         // Real-time message flow:
         // client -> socket -> MongoDB save -> room-only broadcast.
         socket.on("chat:message", async (payload = {}, ack) => {
             try {
-                const room = socket.data.warRoom || resolveWarRoomIdFromApiKey(socket.data.apiKey);
-                const content = typeof payload?.content === "string" ? payload.content.trim() : "";
+                const room = socket.data.warRoom || normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
+                const validation = validateWarRoomMessage(payload?.content);
 
                 if (!room) {
                     const message = "Join a war room before sending messages";
                     if (typeof ack === "function") ack({ success: false, message });
-                    socket.emit("chat:error", { message });
+                    emitSocketError(socket, "VALIDATION_ERROR", message);
                     return;
                 }
 
-                if (!content) {
-                    const message = "Message cannot be empty";
+                if (!validation.valid) {
+                    const message = validation.message || "Invalid message";
                     if (typeof ack === "function") ack({ success: false, message });
-                    socket.emit("chat:error", { message });
+                    emitSocketError(socket, "VALIDATION_ERROR", message);
                     return;
                 }
 
                 if (!socket.rooms.has(room)) {
                     const message = "Socket is not in the war room";
                     if (typeof ack === "function") ack({ success: false, message });
-                    socket.emit("chat:error", { message });
+                    emitSocketError(socket, "VALIDATION_ERROR", message);
                     return;
                 }
 
                 const savedMessage = await saveWarRoomMessage({
                     roomId: room,
-                    content,
+                    content: validation.value,
                     apiKey: socket.data.apiKey,
                 });
 
                 const messagePayload = toMessagePayload(savedMessage);
                 ioInstance.to(room).emit("chat:message", messagePayload);
+                console.log(`[Socket] chat:message room=${room} socket=${socket.id}`);
 
                 if (typeof ack === "function") {
                     ack({ success: true, message: messagePayload });
@@ -242,19 +181,25 @@ export const initSocket = (httpServer) => {
                 const message = error?.message || "Failed to send chat message";
                 console.error("[Socket] chat:message error:", message);
                 if (typeof ack === "function") ack({ success: false, message });
-                socket.emit("chat:error", { message });
+                emitSocketError(socket, "VALIDATION_ERROR", message);
             }
+        });
+
+        // Legacy alias kept so older clients do not break.
+        // We immediately route it through the canonical war room join.
+        socket.on("join_room", (roomName, ack) => {
+            console.log(`[Socket] join_room is deprecated; routing to join_warroom (${normalizeRoomName(roomName) || "api-key room"})`);
+            return handleJoinWarroom(null, ack);
         });
 
         // Keep presence counts in sync when the socket disconnects.
         socket.on("disconnect", (reason) => {
             console.log(`[Socket] Disconnected: ${socket.id} (${reason})`);
+            const rooms = getRoomsForSocket(socket.id);
 
-            roomPresence.forEach((members, room) => {
-                if (members.has(socket.id)) {
-                    const count = removePresence(socket.id, room);
-                    ioInstance.to(room).emit("room:presence", { room, count });
-                }
+            rooms.forEach((room) => {
+                const count = removeUser(room, socket.id);
+                ioInstance.to(room).emit("room:presence", { room, count });
             });
         });
     });
@@ -271,5 +216,5 @@ export const getIo = () => ioInstance;
  */
 export const getRoomPresenceCount = (roomName) => {
     const room = normalizeRoomName(roomName);
-    return roomPresence.get(room)?.size ?? 0;
+    return getCount(room);
 };
