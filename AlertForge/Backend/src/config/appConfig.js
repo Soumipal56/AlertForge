@@ -17,6 +17,8 @@ const appConfig = {
     TWILIO_SID: process.env.TWILIO_SID,
     TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
     TWILIO_PHONE_NUMBER: process.env.TWILIO_WHATSAPP_NUMBER,
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
 };
 
 export default appConfig;
