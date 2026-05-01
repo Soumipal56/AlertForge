@@ -5,6 +5,7 @@ import WarRoomChat from "@/pages/WarRoomChat";
 import LoginPage from "@/features/pages/auth/Login";
 import RegisterPage from "@/features/pages/auth/Register";
 import { AuthenticateWithRedirectCallback } from "@clerk/react";
+import DashboardLayout from "@/features/pages/dashboard/Dashboard";
 
 export const routes = createBrowserRouter([
   {
@@ -31,4 +32,8 @@ export const routes = createBrowserRouter([
     path: "/register",
     element: <RegisterPage />,
   },
+  {
+    path: "/dashboard",
+    element: <DashboardLayout />,
+  }
 ]);
