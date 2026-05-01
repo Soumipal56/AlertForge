@@ -1,6 +1,5 @@
 import { routes } from "./app.routes";
 import { RouterProvider } from "react-router";
-import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
 
 function App() {
   return (

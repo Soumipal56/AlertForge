@@ -4,6 +4,16 @@ import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from "../config/constants.js";
 import { sendIncidentNotification } from "../services/notification/notification.service.js";
+import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
+
+const buildIncidentSocketPayload = (incident) => ({
+    id: incident?._id?.toString?.() || incident?.id || null,
+    message: incident?.message,
+    severity: incident?.severity,
+    status: incident?.status,
+    createdAt: incident?.createdAt,
+    updatedAt: incident?.updatedAt,
+});
 
 /**  
  * @description Controller function to create a new incident
@@ -31,6 +41,11 @@ export const createIncident = async (req, res, next) => {
         //NOTE - for making our api faster we are sending email notification in the background without waiting for it to complete. 
         //! This is a fire-and-forget approach. If we want to ensure that the email is sent before responding, we can await this function, but it will increase the response time of our API.
         sendIncidentNotification(data);
+        emitNewIncident(incident);
+        emitTimelineEvent({
+            type: "incident.created",
+            incident: buildIncidentSocketPayload(incident),
+        });
 
         return res
             .status(HTTP_STATUS.CREATED)
@@ -117,6 +132,12 @@ export const updateIncidentStatus = async (req, res, next) => {
         if (!updated) {
             throw new ApiError(404, "Incident not found");
         }
+
+        emitIncidentUpdate(updated);
+        emitTimelineEvent({
+            type: "incident.status_changed",
+            incident: buildIncidentSocketPayload(updated),
+        });
 
         return res.json(new ApiResponse(200, "Incident updated", updated));
     } catch (error) {
