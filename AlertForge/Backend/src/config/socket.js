@@ -219,6 +219,7 @@ export const initSocket = (httpServer) => {
                         room,
                         count,
                         messages: recentMessages.reverse().map(toMessagePayload),
+                        status: incident.status,
                     });
                 }
 
@@ -258,6 +259,19 @@ export const initSocket = (httpServer) => {
                     if (typeof ack === "function") ack({ success: false, message });
                     emitSocketError(socket, "VALIDATION_ERROR", message);
                     return;
+                }
+
+                // Security: Prevent messages in resolved incidents (read-only mode)
+                if (room.startsWith("incident:")) {
+                    const incidentId = room.split(":")[1];
+                    const incident = await getIncidentByIdService(incidentId);
+                    
+                    if (incident && incident.status === "resolved") {
+                        const message = "This incident is resolved. Chat is read-only.";
+                        if (typeof ack === "function") ack({ success: false, message });
+                        emitSocketError(socket, "FORBIDDEN", message);
+                        return;
+                    }
                 }
 
                 const savedMessage = await saveWarRoomMessage({
