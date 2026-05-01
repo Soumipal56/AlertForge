@@ -34,6 +34,7 @@ function WarRoomChat() {
     const [presence, setPresence] = useState(0);
     const [socketStatus, setSocketStatus] = useState("disconnected");
     const [messageInput, setMessageInput] = useState("");
+    const [pendingFile, setPendingFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState("");
 
@@ -160,7 +161,7 @@ function WarRoomChat() {
     };
 
     const handleSendMessage = (event) => {
-        event.preventDefault();
+        if (event) event.preventDefault();
 
         if (incidentStatus === "resolved") {
             setError("This incident is resolved. You cannot send messages.");
@@ -175,18 +176,24 @@ function WarRoomChat() {
             return;
         }
 
-        if (!content) {
-            setError("Type a message before sending.");
+        // Must have either text or a file
+        if (!content && !pendingFile) {
+            setError("Type a message or select a file before sending.");
             return;
         }
 
-        socket.emit("chat:message", { content }, (ack) => {
+        socket.emit("chat:message", { 
+            content,
+            fileUrl: pendingFile?.url || null,
+            fileType: pendingFile?.type || null
+        }, (ack) => {
             if (!ack?.success) {
                 setError(ack?.message || "Failed to send message");
                 return;
             }
 
             setMessageInput("");
+            setPendingFile(null);
         });
     };
 
@@ -221,16 +228,11 @@ function WarRoomChat() {
                 throw new Error(data.message || "Upload failed");
             }
 
-            // Send via socket
-            const socket = getSocket() || initializeSocket(activeApiKey.trim(), activeName.trim());
-            socket.emit("chat:message", {
-                content: "",
-                fileUrl: data.url,
-                fileType: data.fileType,
-            }, (ack) => {
-                if (!ack?.success) {
-                    setError(ack?.message || "Failed to send file message");
-                }
+            // Store file metadata (DO NOT SEND IMMEDIATELY)
+            setPendingFile({
+                url: data.url,
+                type: data.fileType,
+                name: file.name
             });
 
         } catch (err) {
@@ -346,7 +348,9 @@ function WarRoomChat() {
                         <UpdateComposer 
                             messageInput={messageInput}
                             setMessageInput={setMessageInput}
-                            onSendMessage={() => handleSendMessage({ preventDefault: () => {} })}
+                            pendingFile={pendingFile}
+                            setPendingFile={setPendingFile}
+                            onSendMessage={handleSendMessage}
                             onFileChange={handleFileChange}
                             isUploading={isUploading}
                             disabled={!roomId || incidentStatus === "resolved"}

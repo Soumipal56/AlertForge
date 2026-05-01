@@ -7,21 +7,65 @@ import React from "react";
 const UpdateComposer = ({ 
     messageInput, 
     setMessageInput, 
+    pendingFile,
+    setPendingFile,
     onSendMessage, 
     onFileChange, 
     isUploading, 
     disabled,
     placeholder
 }) => {
+    // Determine if the send button should be enabled
+    const canSend = !disabled && !isUploading && (messageInput.trim() || pendingFile);
+
     return (
         <div className="border-t border-white/5 bg-black/40 p-6">
             <form 
                 onSubmit={(e) => {
                     e.preventDefault();
-                    onSendMessage();
+                    if (canSend) onSendMessage();
                 }} 
                 className="mx-auto max-w-3xl"
             >
+                {/* Pending File Preview Area */}
+                {pendingFile && (
+                    <div className="mb-4 flex items-end gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="group relative rounded-2xl border border-white/10 bg-black/30 p-2 pr-10 backdrop-blur-sm">
+                            <div className="flex items-center gap-3">
+                                {pendingFile.type === "image" ? (
+                                    <div className="h-16 w-16 overflow-hidden rounded-lg border border-white/5 bg-black/20">
+                                        <img 
+                                            src={pendingFile.url} 
+                                            alt="Preview" 
+                                            className="h-full w-full object-cover" 
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-red-500/20 text-red-400">
+                                        <span className="text-xs font-bold uppercase">PDF</span>
+                                    </div>
+                                )}
+                                <div className="flex-1 overflow-hidden pr-2">
+                                    <div className="text-[10px] uppercase tracking-wider text-slate-500">Selected file</div>
+                                    <div className="truncate text-xs font-medium text-slate-300">
+                                        {pendingFile.name || "Document"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Remove File Button */}
+                            <button
+                                type="button"
+                                onClick={() => setPendingFile(null)}
+                                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-red-500 text-white shadow-lg transition hover:bg-red-600"
+                                title="Remove file"
+                            >
+                                <span className="text-sm">×</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex gap-3">
                     {/* Text Input Area */}
                     <div className="relative flex-1">
@@ -37,9 +81,9 @@ const UpdateComposer = ({
                         />
                         <button
                             type="submit"
-                            disabled={disabled || isUploading || !messageInput.trim()}
+                            disabled={!canSend}
                             className={`absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black transition hover:bg-slate-200 disabled:bg-slate-500 disabled:cursor-not-allowed ${
-                                (disabled || isUploading) ? "opacity-50" : ""
+                                (!canSend) ? "opacity-50" : ""
                             }`}
                         >
                             <span className="text-lg">↵</span>
