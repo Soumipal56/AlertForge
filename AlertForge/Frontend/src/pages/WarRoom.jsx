@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createIncident, getIncidents, updateIncidentStatus } from "@/services/api";
-import { initializeSocket } from "@/services/socket";
+import { initializeSocket, reinitializeSocket } from "@/services/socket";
 
 const initialFormState = {
     message: "",
@@ -62,6 +62,8 @@ function WarRoom() {
     const [creating, setCreating] = useState(false);
     const [apiKey, setApiKey] = useState("");
     const [form, setForm] = useState(initialFormState);
+    const [roomPresence, setRoomPresence] = useState(0);
+    const [activeRoom, setActiveRoom] = useState("");
 
     const sortedIncidents = useMemo(() => incidents, [incidents]);
 
@@ -100,11 +102,28 @@ function WarRoom() {
         fetchData();
     }, [apiKey]);
 
+    // Re-initialize the socket (with the new API key in the handshake) whenever
+    // the key changes. The new socket is created in reinitializeSocket().
+    useEffect(() => {
+        if (!apiKey.trim()) return;
+        reinitializeSocket();
+    }, [apiKey]);
+
     useEffect(() => {
         const socket = initializeSocket();
 
-        const handleConnect = () => setSocketStatus("connected");
-        const handleDisconnect = () => setSocketStatus("disconnected");
+        const handleConnect = () => {
+            setSocketStatus("connected");
+            // Re-join active room after reconnect
+            if (activeRoom) {
+                socket.emit("join_room", activeRoom);
+            }
+        };
+        const handleDisconnect = () => {
+            setSocketStatus("disconnected");
+            setRoomPresence(0);
+        };
+        const handlePresence = ({ count }) => setRoomPresence(count);
         const handleNewIncident = (incident) => {
             const normalized = normalizeIncident(incident);
             if (!normalized.id) {
@@ -153,26 +172,44 @@ function WarRoom() {
 
         socket.on("connect", handleConnect);
         socket.on("disconnect", handleDisconnect);
+        socket.on("room:presence", handlePresence);
         socket.on("incident:new", handleNewIncident);
         socket.on("incident:update", handleIncidentUpdate);
         socket.on("timeline:event", handleTimelineEvent);
 
         if (socket.connected) {
             setSocketStatus("connected");
+            if (activeRoom) socket.emit("join_room", activeRoom);
         }
 
         return () => {
             socket.off("connect", handleConnect);
             socket.off("disconnect", handleDisconnect);
+            socket.off("room:presence", handlePresence);
             socket.off("incident:new", handleNewIncident);
             socket.off("incident:update", handleIncidentUpdate);
             socket.off("timeline:event", handleTimelineEvent);
         };
-    }, []);
+    }, [activeRoom]);
 
     const handleInputChange = (event) => {
         const { name, value } = event.target;
         setForm((current) => ({ ...current, [name]: value }));
+    };
+
+    // When the user enters a service name, auto-join that War Room
+    const handleServiceChange = (event) => {
+        const { value } = event.target;
+        setForm((current) => ({ ...current, service: value }));
+
+        if (value.trim()) {
+            const room = value.trim().toLowerCase();
+            setActiveRoom(room);
+            const socket = initializeSocket();
+            if (socket.connected) {
+                socket.emit("join_room", room);
+            }
+        }
     };
 
     const handleCreateIncident = async (event) => {
@@ -228,18 +265,22 @@ function WarRoom() {
                                 Loaded from the backend incidents API and updated instantly through Socket.io events.
                             </p>
                         </div>
-                        <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300 sm:grid-cols-3">
+                        <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300 sm:grid-cols-4">
                             <div>
                                 <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Socket</div>
-                                <div className="mt-1 font-medium text-white">{socketStatus}</div>
+                                <div className={`mt-1 font-medium ${socketStatus === "connected" ? "text-emerald-400" : "text-red-400"}`}>{socketStatus}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-[0.2em] text-slate-400">War Room</div>
+                                <div className="mt-1 font-medium text-white">{activeRoom || "global"}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Responders</div>
+                                <div className="mt-1 font-medium text-emerald-400">{roomPresence}</div>
                             </div>
                             <div>
                                 <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Incidents</div>
                                 <div className="mt-1 font-medium text-white">{sortedIncidents.length}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Timeline</div>
-                                <div className="mt-1 font-medium text-white">{timeline.length}</div>
                             </div>
                         </div>
                     </div>
@@ -330,8 +371,8 @@ function WarRoom() {
                                     type="text"
                                     name="service"
                                     value={form.service}
-                                    onChange={handleInputChange}
-                                    placeholder="Affected service"
+                                    onChange={handleServiceChange}
+                                    placeholder="Affected service (joins War Room)"
                                     className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
                                     required
                                 />
