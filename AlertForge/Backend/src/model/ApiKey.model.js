@@ -4,11 +4,18 @@ const apiKeySchema = new mongoose.Schema({
     key: {
         type: String,
         required: true,
+        unique: true,
+        index: true,
+    },
+
+    name: {
+        type: String,
+        trim: true,
     },
 
     serviceName: {
         type: String,
-        required: true,
+        trim: true,
     },
 
     isActive: {

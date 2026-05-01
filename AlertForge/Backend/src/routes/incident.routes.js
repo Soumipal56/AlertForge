@@ -6,14 +6,12 @@ import { createIncident, getAllIncidents, getIncidentById, updateIncidentStatus 
 
 const incidentRouter = express.Router();
 
+incidentRouter.use(validateApiKey);
 
-incidentRouter.post("/", validateApiKey, createIncident);
-
-incidentRouter.get("/", validateApiKey, getAllIncidents);
-
-incidentRouter.get("/:id", validateApiKey, getIncidentById);
-
-incidentRouter.patch("/:id/status", validateApiKey, updateIncidentStatus);
+incidentRouter.post("/", createIncident);
+incidentRouter.get("/", getAllIncidents);
+incidentRouter.get("/:id", getIncidentById);
+incidentRouter.patch("/:id/status", updateIncidentStatus);
 
 
 
