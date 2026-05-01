@@ -56,7 +56,16 @@ export const emitIncidentUpdate = (incident) => {
     const payload = buildIncidentPayload(incident);
     if (!payload.id) return;
 
+    // 1. Notify service room (for dashboard list updates)
     resolveTarget(io, incident?.service).emit("incident:update", payload);
+
+    // 2. Notify specific incident room if resolved (for live war room read-only mode toggle)
+    if (payload.status === "resolved") {
+        io.to(`incident:${payload.id}`).emit("incident:resolved", {
+            incidentId: payload.id,
+            status: payload.status,
+        });
+    }
 };
 
 /**

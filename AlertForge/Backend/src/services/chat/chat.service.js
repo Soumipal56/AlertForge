@@ -16,13 +16,26 @@ export const resolveWarRoomIdFromApiKey = (apiKey = {}) => {
 };
 
 /**
+ * Normalizes an incident id into a dedicated room name.
+ * This ensures that incident-specific rooms have a consistent prefix
+ * and do not collide with service-level rooms.
+ * @param {string} incidentId
+ * @returns {string}
+ */
+export const resolveIncidentRoomId = (incidentId) => {
+    const id = typeof incidentId === "string" ? incidentId.trim() : "";
+    return id ? `incident:${id}`.toLowerCase() : "";
+};
+
+/**
  * Builds a safe sender snapshot for persistence and socket payloads.
  * @param {Object} apiKey
+ * @param {Object} user
  * @returns {{ apiKeyId: string, name: string, serviceName: string }}
  */
-export const buildSenderIdentity = (apiKey = {}) => ({
+export const buildSenderIdentity = (apiKey = {}, user = {}) => ({
     apiKeyId: typeof apiKey.id === "string" ? apiKey.id : "",
-    name: typeof apiKey.name === "string" && apiKey.name.trim() ? apiKey.name.trim() : "Unknown",
+    name: user.name || (typeof apiKey.name === "string" && apiKey.name.trim() ? apiKey.name.trim() : "Unknown"),
     serviceName: typeof apiKey.serviceName === "string" ? apiKey.serviceName.trim() : "",
 });
 
@@ -47,20 +60,24 @@ export const validateMessage = (content) => {
 
 /**
  * Persists a validated war room message.
- * @param {{ roomId: string, content: string, apiKey: Object }} params
+ * @param {{ roomId: string, content: string, fileUrl?: string, fileType?: string, apiKey: Object, user: Object }} params
  * @returns {Promise<Object>}
  */
-export const saveMessage = async ({ roomId, content, apiKey }) => {
-    const validation = validateMessage(content);
+export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, user }) => {
+    // If we have a file, we don't strictly require text content.
+    const validation = validateMessage(content || "");
 
-    if (!validation.valid) {
+    // Only throw if there's no file AND the content is invalid (e.g. empty).
+    if (!validation.valid && !fileUrl) {
         throw new Error(validation.message);
     }
 
     return await createWarRoomMessageDAO({
         roomId,
-        content: validation.value,
-        sender: buildSenderIdentity(apiKey),
+        content: validation.value || "",
+        fileUrl,
+        fileType,
+        sender: buildSenderIdentity(apiKey, user),
     });
 };
 

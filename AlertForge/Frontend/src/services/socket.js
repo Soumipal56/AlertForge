@@ -12,8 +12,9 @@ let socketApiKey = "";
  * @param {string} apiKey
  * @returns {import("socket.io-client").Socket}
  */
-export const initializeSocket = (apiKey = "") => {
+export const initializeSocket = (apiKey = "", name = "") => {
     const normalizedKey = typeof apiKey === "string" ? apiKey.trim() : "";
+    const normalizedName = typeof name === "string" ? name.trim() : "";
 
     if (socketInstance?.connected && normalizedKey === socketApiKey) {
         return socketInstance;
@@ -34,6 +35,7 @@ export const initializeSocket = (apiKey = "") => {
         autoConnect: true,
         auth: {
             token: normalizedKey,
+            name: normalizedName,
         },
     });
 
@@ -65,9 +67,9 @@ export const disconnectSocket = () => {
  * @param {string} apiKey
  * @returns {import("socket.io-client").Socket}
  */
-export const reinitializeSocket = (apiKey = "") => {
+export const reinitializeSocket = (apiKey = "", name = "") => {
     disconnectSocket();
-    return initializeSocket(apiKey);
+    return initializeSocket(apiKey, name);
 };
 
 /**

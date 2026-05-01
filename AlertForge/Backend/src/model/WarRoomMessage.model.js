@@ -14,8 +14,18 @@ const warRoomMessageSchema = new mongoose.Schema({
     },
     content: {
         type: String,
-        required: true,
+        default: "",
         trim: true,
+    },
+    fileUrl: {
+        type: String,
+        default: "",
+        trim: true,
+    },
+    fileType: {
+        type: String,
+        enum: ["image", "pdf", null],
+        default: null,
     },
     sender: {
         apiKeyId: {
@@ -34,6 +44,17 @@ const warRoomMessageSchema = new mongoose.Schema({
     },
 }, {
     timestamps: true,
+});
+
+/**
+ * Custom validation logic:
+ * A message is valid if it has either text content or a file attachment.
+ * It should only fail if both are missing.
+ */
+warRoomMessageSchema.pre("validate", async function () {
+    if (!this.content && !this.fileUrl) {
+        throw new Error("Message must have either content or file attachment.");
+    }
 });
 
 warRoomMessageSchema.index({ roomId: 1, createdAt: -1 });

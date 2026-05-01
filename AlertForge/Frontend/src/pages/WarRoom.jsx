@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { createIncident, getIncidents, updateIncidentStatus } from "@/services/api";
 import { initializeSocket, reinitializeSocket } from "@/services/socket";
 
@@ -313,13 +314,21 @@ function WarRoom() {
                                                 Updated: {incident.updatedAt || incident.createdAt || "just now"}
                                             </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleQuickResolve(incident.id)}
-                                            className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/20"
-                                        >
-                                            Mark resolved
-                                        </button>
+                                        <div className="flex flex-col gap-2">
+                                            <Link
+                                                to={`/warroom/${incident.id}`}
+                                                className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-2 text-center text-sm font-medium text-sky-100 transition hover:bg-sky-500/20"
+                                            >
+                                                Open War Room
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleQuickResolve(incident.id)}
+                                                className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/20"
+                                            >
+                                                Mark resolved
+                                            </button>
+                                        </div>
                                     </div>
                                 </article>
                             ))}
