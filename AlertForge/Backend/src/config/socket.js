@@ -4,10 +4,12 @@ import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
 import {
     getRecentWarRoomMessages,
     resolveWarRoomIdFromApiKey,
+    resolveIncidentRoomId,
     saveWarRoomMessage,
     validateWarRoomMessage,
 } from "../services/warroom/warRoomChat.service.js";
 import { addUser, getCount, removeUser, getRoomsForSocket } from "../services/socket/presence.service.js";
+import { getIncidentByIdService } from "../services/incident.service.js";
 
 let ioInstance = null;
 
@@ -35,6 +37,8 @@ const toMessagePayload = (message) => ({
     id: message?._id?.toString?.() || message?.id || null,
     roomId: message?.roomId,
     content: message?.content,
+    fileUrl: message?.fileUrl,
+    fileType: message?.fileType,
     sender: message?.sender,
     createdAt: message?.createdAt,
     updatedAt: message?.updatedAt,
@@ -67,6 +71,7 @@ export const initSocket = (httpServer) => {
     ioInstance.use(async (socket, next) => {
         try {
             const rawToken = socket.handshake.auth?.token;
+            const rawName = socket.handshake.auth?.name;
 
             if (!rawToken) {
                 return next(new Error("Authentication error: No API key provided"));
@@ -79,10 +84,17 @@ export const initSocket = (httpServer) => {
                 return next(new Error("Authentication error: Invalid or inactive API key"));
             }
 
+            // Store API key metadata for authorization
             socket.data.apiKey = {
                 id: apiKey._id?.toString(),
                 name: apiKey.name,
                 serviceName: apiKey.serviceName,
+            };
+
+            // Store session-based user identity
+            socket.data.user = {
+                name: typeof rawName === "string" ? rawName.trim() : null,
+                nameProvided: !!(typeof rawName === "string" && rawName.trim()),
             };
 
             return next();
@@ -113,7 +125,16 @@ export const initSocket = (httpServer) => {
                 socket.data.warRoom = room;
 
                 const count = addUser(room, socket.id);
+
+                // Assign auto-name ONLY if user did not provide one
+                if (!socket.data.user.nameProvided) {
+                    socket.data.user.name = `User-${count}`;
+                }
+
                 const recentMessages = await getRecentWarRoomMessages(room);
+
+                // Notify others that a new user has joined
+                socket.to(room).emit("user:joined", { name: socket.data.user.name });
 
                 ioInstance.to(room).emit("room:presence", { room, count });
 
@@ -126,7 +147,7 @@ export const initSocket = (httpServer) => {
                     });
                 }
 
-                console.log(`[Socket] ${socket.id} joined war room "${room}" (${count} online)`);
+                console.log(`[Socket] ${socket.id} (${socket.data.user.name}) joined war room "${room}" (${count} online)`);
             } catch (error) {
                 const message = error?.message || "Failed to join war room";
                 if (typeof ack === "function") ack({ success: false, message });
@@ -136,11 +157,89 @@ export const initSocket = (httpServer) => {
 
         socket.on("join_warroom", handleJoinWarroom);
 
+        /**
+         * @description New event handler for joining incident-specific rooms.
+         * Validates the incident exists and the user has access via their API key.
+         */
+        socket.on("join_incident_room", async (payload = {}, ack) => {
+            try {
+                const { incidentId } = payload;
+                if (!incidentId) {
+                    throw new Error("Incident ID is required to join an incident room");
+                }
+
+                // 1. Fetch the incident to validate it exists.
+                const incident = await getIncidentByIdService(incidentId);
+                if (!incident) {
+                    throw new Error(`Incident with ID ${incidentId} not found`);
+                }
+
+                // 2. Security Check: Ensure the incident belongs to this specific API key.
+                const userKeyId = socket.data.apiKey?.id;
+                const incidentOwnerId = incident.apiKeyId?.toString();
+
+                console.log(`[Socket Auth Debug] Room: join_incident_room`);
+                console.log(`[Socket Auth Debug] Incident ID: ${incidentId}`);
+                console.log(`[Socket Auth Debug] User API Key ID: ${userKeyId}`);
+                console.log(`[Socket Auth Debug] Incident Owner ID: ${incidentOwnerId || "MISSING"}`);
+
+                if (!incident.apiKeyId) {
+                    throw new Error("This incident has no owner assigned (legacy data). It cannot be accessed via war room.");
+                }
+
+                if (incidentOwnerId !== userKeyId) {
+                    console.warn(`[Socket Auth] Unauthorized join attempt. Incident owner: ${incidentOwnerId}, User: ${userKeyId}`);
+                    throw new Error("You are not authorized to access this incident's war room");
+                }
+
+                // 3. Resolve internal room name and join.
+                const room = normalizeRoomName(resolveIncidentRoomId(incidentId));
+                socket.join(room);
+                
+                // Track this as the active room for subsequent chat messages.
+                socket.data.activeRoom = room;
+
+                // 4. Update presence and fetch history.
+                const count = addUser(room, socket.id);
+
+                // Assign auto-name ONLY if user did not provide one
+                if (!socket.data.user.nameProvided) {
+                    socket.data.user.name = `User-${count}`;
+                }
+
+                const recentMessages = await getRecentWarRoomMessages(room);
+
+                // Notify others that a new user has joined
+                socket.to(room).emit("user:joined", { name: socket.data.user.name });
+
+                // Notify all members in the room of new presence count.
+                ioInstance.to(room).emit("room:presence", { room, count });
+
+                if (typeof ack === "function") {
+                    ack({
+                        success: true,
+                        room,
+                        count,
+                        messages: recentMessages.reverse().map(toMessagePayload),
+                        status: incident.status,
+                    });
+                }
+
+                console.log(`[Socket] ${socket.id} (${socket.data.user.name}) joined incident room "${room}"`);
+            } catch (error) {
+                const message = error?.message || "Failed to join incident war room";
+                console.error("[Socket] join_incident_room error:", message);
+                if (typeof ack === "function") ack({ success: false, message });
+                emitSocketError(socket, "VALIDATION_ERROR", message);
+            }
+        });
+
         // Real-time message flow:
         // client -> socket -> MongoDB save -> room-only broadcast.
         socket.on("chat:message", async (payload = {}, ack) => {
             try {
-                const room = socket.data.warRoom || normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
+                // Priority: activeRoom (incident-specific) -> warRoom (service-level fallback) -> API key derived room.
+                const room = socket.data.activeRoom || socket.data.warRoom || normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
                 const validation = validateWarRoomMessage(payload?.content);
 
                 if (!room) {
@@ -150,7 +249,7 @@ export const initSocket = (httpServer) => {
                     return;
                 }
 
-                if (!validation.valid) {
+                if (!validation.valid && !payload?.fileUrl) {
                     const message = validation.message || "Invalid message";
                     if (typeof ack === "function") ack({ success: false, message });
                     emitSocketError(socket, "VALIDATION_ERROR", message);
@@ -164,10 +263,26 @@ export const initSocket = (httpServer) => {
                     return;
                 }
 
+                // Security: Prevent messages in resolved incidents (read-only mode)
+                if (room.startsWith("incident:")) {
+                    const incidentId = room.split(":")[1];
+                    const incident = await getIncidentByIdService(incidentId);
+                    
+                    if (incident && incident.status === "resolved") {
+                        const message = "This incident is resolved. Chat is read-only.";
+                        if (typeof ack === "function") ack({ success: false, message });
+                        emitSocketError(socket, "FORBIDDEN", message);
+                        return;
+                    }
+                }
+
                 const savedMessage = await saveWarRoomMessage({
                     roomId: room,
-                    content: validation.value,
+                    content: payload?.content,
+                    fileUrl: payload?.fileUrl,
+                    fileType: payload?.fileType,
                     apiKey: socket.data.apiKey,
+                    user: socket.data.user,
                 });
 
                 const messagePayload = toMessagePayload(savedMessage);
@@ -199,6 +314,7 @@ export const initSocket = (httpServer) => {
 
             rooms.forEach((room) => {
                 const count = removeUser(room, socket.id);
+                ioInstance.to(room).emit("user:left", { name: socket.data.user?.name || "Anonymous" });
                 ioInstance.to(room).emit("room:presence", { room, count });
             });
         });

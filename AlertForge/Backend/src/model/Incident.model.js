@@ -30,6 +30,17 @@ const incidentSchema = new mongoose.Schema({
         type: String,
         enum: Object.values(INCIDENT_STATUS),
         default: INCIDENT_STATUS.OPEN,
+    },
+    /**
+     * Ownership ID (API Key reference).
+     * This is the primary field for authorization. 
+     * We enforce that an incident can only be accessed by the key that created it.
+     */
+    apiKeyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ApiKey",
+        required: true,
+        index: true,
     }
 }, {
     timestamps: true

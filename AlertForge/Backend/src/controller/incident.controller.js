@@ -51,7 +51,10 @@ export const createIncident = async (req, res, next) => {
             );
         }
 
-        const incident = await createIncidentService(data);
+        const incident = await createIncidentService({
+            ...data,
+            apiKeyId: req.apiKey._id,
+        });
         await saveTimelineEntry("incident.created", incident, incident?.message || "");
         //NOTE - for making our api faster we are sending email notification in the background without waiting for it to complete. 
         //! This is a fire-and-forget approach. If we want to ensure that the email is sent before responding, we can await this function, but it will increase the response time of our API.

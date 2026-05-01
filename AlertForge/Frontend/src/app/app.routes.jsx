@@ -20,6 +20,10 @@ export const routes = createBrowserRouter([
     element: <WarRoomChat />,
   },
   {
+    path: "/warroom/:incidentId",
+    element: <WarRoomChat />,
+  },
+  {
     path: "/",
     element: <Landing />,
   },
