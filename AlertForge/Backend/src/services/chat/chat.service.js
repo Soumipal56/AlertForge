@@ -16,6 +16,18 @@ export const resolveWarRoomIdFromApiKey = (apiKey = {}) => {
 };
 
 /**
+ * Normalizes an incident id into a dedicated room name.
+ * This ensures that incident-specific rooms have a consistent prefix
+ * and do not collide with service-level rooms.
+ * @param {string} incidentId
+ * @returns {string}
+ */
+export const resolveIncidentRoomId = (incidentId) => {
+    const id = typeof incidentId === "string" ? incidentId.trim() : "";
+    return id ? `incident:${id}`.toLowerCase() : "";
+};
+
+/**
  * Builds a safe sender snapshot for persistence and socket payloads.
  * @param {Object} apiKey
  * @returns {{ apiKeyId: string, name: string, serviceName: string }}

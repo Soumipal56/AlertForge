@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router";
 import { getSocket, initializeSocket, reinitializeSocket } from "@/services/socket";
 
 /**
@@ -18,6 +19,7 @@ const normalizeMessage = (message) => ({
 });
 
 function WarRoomChat() {
+    const params = useParams();
     const [apiKeyInput, setApiKeyInput] = useState("");
     const [activeApiKey, setActiveApiKey] = useState("");
     const [roomId, setRoomId] = useState("");
@@ -39,20 +41,41 @@ function WarRoomChat() {
         }
 
         const socket = reinitializeSocket(activeApiKey.trim());
+        const { incidentId } = params;
 
-        // Once the socket connects, join the room derived from the API key.
+        // Once the socket connects, join either a specific incident room (if deep-linked)
+        // or the default service-level war room resolved from the API key.
         const handleConnect = () => {
             setSocketStatus("connected");
-            socket.emit("join_warroom", null, (ack) => {
-                if (!ack?.success) {
-                    setError(ack?.message || "Failed to join war room");
-                    return;
-                }
 
-                setRoomId(ack.room || "");
-                setPresence(ack.count || 0);
-                setMessages((ack.messages || []).map(normalizeMessage));
-            });
+            if (incidentId) {
+                // Scenario: Deep-linkable incident room.
+                console.log(`[Socket Debug] Attempting to join incident room: ${incidentId}`);
+                console.log(`[Socket Debug] With API Key: ${activeApiKey.substring(0, 8)}...`);
+                
+                socket.emit("join_incident_room", { incidentId }, (ack) => {
+                    if (!ack?.success) {
+                        setError(ack?.message || `Failed to join incident room ${incidentId}`);
+                        return;
+                    }
+
+                    setRoomId(ack.room || "");
+                    setPresence(ack.count || 0);
+                    setMessages((ack.messages || []).map(normalizeMessage));
+                });
+            } else {
+                // Scenario: Global/Service war room.
+                socket.emit("join_warroom", null, (ack) => {
+                    if (!ack?.success) {
+                        setError(ack?.message || "Failed to join war room");
+                        return;
+                    }
+
+                    setRoomId(ack.room || "");
+                    setPresence(ack.count || 0);
+                    setMessages((ack.messages || []).map(normalizeMessage));
+                });
+            }
         };
 
         const handleDisconnect = () => {
@@ -99,7 +122,7 @@ function WarRoomChat() {
             socket.off("chat:message", handleChatMessage);
             socket.off("chat:error", handleChatError);
         };
-    }, [activeApiKey]);
+    }, [activeApiKey, params.incidentId]);
 
     const handleConnect = (event) => {
         event.preventDefault();
@@ -145,9 +168,13 @@ function WarRoomChat() {
             <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
                 <div className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
                     <p className="text-sm uppercase tracking-[0.3em] text-sky-300/80">War Room Chat</p>
-                    <h1 className="mt-2 text-3xl font-semibold sm:text-5xl">API-key joined group chat</h1>
+                    <h1 className="mt-2 text-3xl font-semibold sm:text-5xl">
+                        {params.incidentId ? "Incident War Room" : "Group war room"}
+                    </h1>
                     <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                        Enter an API key, join the matching room, and chat in real time with everyone using the same room scope.
+                        {params.incidentId 
+                            ? `Collaborate in real-time to resolve incident ${params.incidentId}.`
+                            : "Enter an API key, join the matching room, and chat in real time with everyone using the same room scope."}
                     </p>
                 </div>
 
