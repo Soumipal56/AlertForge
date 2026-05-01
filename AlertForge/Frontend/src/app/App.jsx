@@ -3,10 +3,12 @@ import { RouterProvider } from "react-router";
 
 function App() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
       <RouterProvider router={routes} />
     </div>
   );
 }
 
+
 export default App;
+

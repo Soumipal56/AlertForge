@@ -4,8 +4,13 @@ import WarRoom from "@/pages/WarRoom";
 import WarRoomChat from "@/pages/WarRoomChat";
 import LoginPage from "@/features/pages/auth/Login";
 import RegisterPage from "@/features/pages/auth/Register";
+import { AuthenticateWithRedirectCallback } from "@clerk/react";
 
 export const routes = createBrowserRouter([
+  {
+    path: "/sso-callback",
+    element: <AuthenticateWithRedirectCallback />,
+  },
   {
     path: "/create-incident",
     element: <WarRoom />,
