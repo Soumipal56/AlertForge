@@ -40,7 +40,7 @@ export const createIncident = async (req, res, next) => {
         const incident = await createIncidentService(data);
         //NOTE - for making our api faster we are sending email notification in the background without waiting for it to complete. 
         //! This is a fire-and-forget approach. If we want to ensure that the email is sent before responding, we can await this function, but it will increase the response time of our API.
-        sendIncidentNotification(data);
+        sendIncidentNotification(incident);
         emitNewIncident(incident);
         emitTimelineEvent({
             type: "incident.created",

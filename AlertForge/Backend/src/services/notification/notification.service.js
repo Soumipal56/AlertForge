@@ -1,5 +1,6 @@
 import { sendIncidentEmail } from "./email.service.js";
 import { sendWhatsApp } from "./whatsapp.service.js";
+import { sendWebhookNotification } from "./webhook.service.js";
 /**  
  * Sends an incident notification email to the specified recipient.
  * @param {Object} data - The incident data containing the message to be sent.
@@ -16,6 +17,7 @@ export const sendIncidentNotification = async (data) => {
         await sendWhatsApp({
             message: data.message,
         });
+        await sendWebhookNotification(data);
     } catch (error) {
         console.error("Error sending incident notification:", error);
     }
