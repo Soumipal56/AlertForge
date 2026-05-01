@@ -11,6 +11,7 @@ import {
 import { addUser, getCount, removeUser, getRoomsForSocket } from "../services/socket/presence.service.js";
 import { getIncidentByIdService } from "../services/incident.service.js";
 import { setupRedisAdapter } from "./redis.adapter.js";
+import { socketConnectionLimiter, throttleSocketEvent, rateLimitConfig } from "../middleware/rateLimiter/index.js";
 
 let ioInstance = null;
 
@@ -72,6 +73,9 @@ export const initSocket = async (httpServer) => {
     // Initialize the Redis Adapter for horizontal scaling (if configured)
     await setupRedisAdapter(ioInstance);
 
+    // Apply connection-level rate limiting (distributed via Redis)
+    ioInstance.use(socketConnectionLimiter);
+
     ioInstance.use(async (socket, next) => {
         try {
             const rawToken = socket.handshake.auth?.token;
@@ -116,6 +120,9 @@ export const initSocket = async (httpServer) => {
         // pass an extra identifier or authentication payload.
         const handleJoinWarroom = async (_payload, ack) => {
             try {
+                // Throttling: Distributed join limit
+                if (!await throttleSocketEvent(socket, "join_room", rateLimitConfig.socket.join)) return;
+
                 const room = normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
 
                 if (!room) {
@@ -242,6 +249,9 @@ export const initSocket = async (httpServer) => {
         // client -> socket -> MongoDB save -> room-only broadcast.
         socket.on("chat:message", async (payload = {}, ack) => {
             try {
+                // Throttling: Max 3 messages per second burst (Distributed)
+                if (!await throttleSocketEvent(socket, "chat:message", rateLimitConfig.socket.message)) return;
+
                 // Priority: activeRoom (incident-specific) -> warRoom (service-level fallback) -> API key derived room.
                 const room = socket.data.activeRoom || socket.data.warRoom || normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
                 const validation = validateWarRoomMessage(payload?.content);
@@ -302,6 +312,20 @@ export const initSocket = async (httpServer) => {
                 if (typeof ack === "function") ack({ success: false, message });
                 emitSocketError(socket, "VALIDATION_ERROR", message);
             }
+        });
+
+        // Typing indicator throttling
+        socket.on("chat:typing", async () => {
+            const room = socket.data.activeRoom || socket.data.warRoom || normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
+            if (!room) return;
+
+            // Distributed Debounce: Max 1 event per 2 seconds
+            if (!await throttleSocketEvent(socket, "typing", rateLimitConfig.socket.typing)) return;
+            
+            socket.to(room).emit("chat:typing", { 
+                name: socket.data.user?.name || "Anonymous",
+                socketId: socket.id
+            });
         });
 
         // Legacy alias kept so older clients do not break.

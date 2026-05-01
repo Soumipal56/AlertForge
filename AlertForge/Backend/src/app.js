@@ -5,8 +5,13 @@ import incidentRouter from "./routes/incident.routes.js";
 import apiKeyRouter from "./routes/apikey.routes.js";
 import uploadRouter from "./routes/upload.routes.js";
 
+import { publicApiLimiter } from "./middleware/rateLimiter/index.js";
+
 const app = express();
 app.use(morgan('dev'));
+
+// Global Rate Limiting Baseline
+app.use(publicApiLimiter);
 
 //NOTE -  Middleware
 app.use(cors({
