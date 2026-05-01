@@ -10,6 +10,7 @@ import {
 } from "../services/warroom/warRoomChat.service.js";
 import { addUser, getCount, removeUser, getRoomsForSocket } from "../services/socket/presence.service.js";
 import { getIncidentByIdService } from "../services/incident.service.js";
+import { setupRedisAdapter } from "./redis.adapter.js";
 
 let ioInstance = null;
 
@@ -60,13 +61,16 @@ const emitSocketError = (socket, type, message) => {
  * @param {import("http").Server} httpServer - The Node.js HTTP server instance.
  * @returns {import("socket.io").Server} The configured Socket.io server instance.
  */
-export const initSocket = (httpServer) => {
+export const initSocket = async (httpServer) => {
     ioInstance = new Server(httpServer, {
         cors: {
             origin: process.env.CLIENT_URL || "http://localhost:5173",
             methods: ["GET", "POST"],
         },
     });
+
+    // Initialize the Redis Adapter for horizontal scaling (if configured)
+    await setupRedisAdapter(ioInstance);
 
     ioInstance.use(async (socket, next) => {
         try {
