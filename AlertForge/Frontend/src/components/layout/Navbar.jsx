@@ -1,6 +1,7 @@
 import { DropdownNavigation } from "@/components/ui/dorpdown-navigation";
 import { Zap, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { SignInButton, SignUpButton, UserButton, Show } from "@clerk/react";
 import {
   Cpu,
   Globe,
@@ -209,18 +210,21 @@ function Navbar() {
 
         {/* RIGHT — Auth buttons */}
         <div className="hidden md:flex items-center gap-2 shrink-0">
-          <a
-            href="/login"
-            className="text-zinc-400 hover:text-white text-sm px-4 py-2 rounded-xl hover:bg-white/[0.06] transition-all duration-200 font-medium"
-          >
-            Log in
-          </a>
-          <a
-            href="/register"
-            className="text-sm px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 transition-all duration-200 font-semibold"
-          >
-            Sign up
-          </a>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="text-zinc-400 hover:text-white text-sm px-4 py-2 rounded-xl hover:bg-white/[0.06] transition-all duration-200 font-medium cursor-pointer">
+                Log in
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="text-sm px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 transition-all duration-200 font-semibold cursor-pointer">
+                Sign up
+              </button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
         <button
           className="md:hidden text-zinc-400 hover:text-white transition-colors p-1"
@@ -248,18 +252,23 @@ function Navbar() {
             </a>
           ))}
           <div className="border-t border-zinc-800 mt-2 pt-3 flex flex-col gap-2">
-            <a
-              href="/login"
-              className="text-zinc-300 text-sm px-3 py-2.5 rounded-lg hover:bg-white/[0.06] transition-all duration-200 font-medium"
-            >
-              Log in
-            </a>
-            <a
-              href="/register"
-              className="text-sm px-3 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold text-center"
-            >
-              Sign up
-            </a>
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className="text-left text-zinc-300 text-sm px-3 py-2.5 rounded-lg hover:bg-white/[0.06] transition-all duration-200 font-medium cursor-pointer">
+                  Log in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="text-center text-sm px-3 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold cursor-pointer">
+                  Sign up
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <div className="px-3 py-2">
+                <UserButton />
+              </div>
+            </Show>
           </div>
         </div>
       )}
