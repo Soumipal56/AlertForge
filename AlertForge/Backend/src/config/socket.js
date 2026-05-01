@@ -1,29 +1,69 @@
 import { Server } from "socket.io";
 import { hashKey } from "../utils/hashKey.js";
 import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
+import {
+    getRecentWarRoomMessages,
+    resolveWarRoomIdFromApiKey,
+    saveWarRoomMessage,
+    validateWarRoomMessage,
+} from "../services/warroom/warRoomChat.service.js";
+import { addUser, getCount, removeUser, getRoomsForSocket } from "../services/socket/presence.service.js";
 
 let ioInstance = null;
 
-// In-memory presence map: roomName -> Set of socket IDs
-const roomPresence = new Map();
+/**
+ * Normalizes any room input so we always store and compare room names
+ * using the same lowercase, trimmed format.
+ * @param {string} roomName
+ * @returns {string}
+ */
+const normalizeRoomName = (roomName) => {
+    if (typeof roomName !== "string") {
+        return "";
+    }
+
+    return roomName.trim().toLowerCase();
+};
+
+/**
+ * Converts a persisted War Room message into the payload we emit to clients.
+ * This keeps socket events stable and avoids leaking internal Mongo fields.
+ * @param {Object} message
+ * @returns {Object}
+ */
+const toMessagePayload = (message) => ({
+    id: message?._id?.toString?.() || message?.id || null,
+    roomId: message?.roomId,
+    content: message?.content,
+    sender: message?.sender,
+    createdAt: message?.createdAt,
+    updatedAt: message?.updatedAt,
+});
+
+/**
+ * Emits a standardized socket error event for runtime validation issues.
+ * @param {import("socket.io").Socket} socket
+ * @param {string} type
+ * @param {string} message
+ */
+const emitSocketError = (socket, type, message) => {
+    socket.emit("error:event", { type, message });
+};
 
 /**
  * @description Initializes the Socket.io server, attaches auth middleware,
- * and sets up connection / join_room / disconnect event handlers.
+ * and sets up connection / room / chat handlers.
  * @param {import("http").Server} httpServer - The Node.js HTTP server instance.
  * @returns {import("socket.io").Server} The configured Socket.io server instance.
  */
 export const initSocket = (httpServer) => {
     ioInstance = new Server(httpServer, {
         cors: {
-            origin: "http://localhost:5173",
+            origin: process.env.CLIENT_URL || "http://localhost:5173",
             methods: ["GET", "POST"],
         },
     });
 
-    // ─── Auth Middleware ───────────────────────────────────────────────────────
-    // Runs before the "connection" event fires. If no valid API key is found the
-    // handshake is rejected and the client never gets a socket.id.
     ioInstance.use(async (socket, next) => {
         try {
             const rawToken = socket.handshake.auth?.token;
@@ -39,7 +79,6 @@ export const initSocket = (httpServer) => {
                 return next(new Error("Authentication error: Invalid or inactive API key"));
             }
 
-            // Attach key metadata to the socket so handlers can read it later
             socket.data.apiKey = {
                 id: apiKey._id?.toString(),
                 name: apiKey.name,
@@ -53,56 +92,114 @@ export const initSocket = (httpServer) => {
         }
     });
 
-    // ─── Connection Handler ────────────────────────────────────────────────────
     ioInstance.on("connection", (socket) => {
         console.log(`[Socket] Connected: ${socket.id} (key: ${socket.data.apiKey?.name || "unnamed"})`);
 
-        // ── join_room ──────────────────────────────────────────────────────────
-        // Clients emit this to scope themselves to a specific service War Room.
-        // Example: socket.emit("join_room", "payment-gateway")
-        socket.on("join_room", (roomName) => {
-            if (typeof roomName !== "string" || !roomName.trim()) return;
+        // Explicit War Room entry point.
+        // We resolve the room from the API key so the client does not need to
+        // pass an extra identifier or authentication payload.
+        const handleJoinWarroom = async (_payload, ack) => {
+            try {
+                const room = normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
 
-            const room = roomName.trim().toLowerCase();
-            socket.join(room);
+                if (!room) {
+                    const message = "War room could not be resolved from API key";
+                    if (typeof ack === "function") ack({ success: false, message });
+                    emitSocketError(socket, "AUTH_ERROR", message);
+                    return;
+                }
 
-            // Track presence
-            if (!roomPresence.has(room)) {
-                roomPresence.set(room, new Set());
-            }
-            roomPresence.get(room).add(socket.id);
+                socket.join(room);
+                socket.data.warRoom = room;
 
-            const count = roomPresence.get(room).size;
-            console.log(`[Socket] ${socket.id} joined room "${room}" (${count} online)`);
+                const count = addUser(room, socket.id);
+                const recentMessages = await getRecentWarRoomMessages(room);
 
-            // Broadcast updated presence count to everyone in the room
-            ioInstance.to(room).emit("room:presence", { room, count });
-        });
-
-        // ── leave_room ─────────────────────────────────────────────────────────
-        socket.on("leave_room", (roomName) => {
-            if (typeof roomName !== "string" || !roomName.trim()) return;
-
-            const room = roomName.trim().toLowerCase();
-            socket.leave(room);
-
-            if (roomPresence.has(room)) {
-                roomPresence.get(room).delete(socket.id);
-                const count = roomPresence.get(room).size;
                 ioInstance.to(room).emit("room:presence", { room, count });
-                console.log(`[Socket] ${socket.id} left room "${room}" (${count} online)`);
+
+                if (typeof ack === "function") {
+                    ack({
+                        success: true,
+                        room,
+                        count,
+                        messages: recentMessages.reverse().map(toMessagePayload),
+                    });
+                }
+
+                console.log(`[Socket] ${socket.id} joined war room "${room}" (${count} online)`);
+            } catch (error) {
+                const message = error?.message || "Failed to join war room";
+                if (typeof ack === "function") ack({ success: false, message });
+                emitSocketError(socket, "VALIDATION_ERROR", message);
+            }
+        };
+
+        socket.on("join_warroom", handleJoinWarroom);
+
+        // Real-time message flow:
+        // client -> socket -> MongoDB save -> room-only broadcast.
+        socket.on("chat:message", async (payload = {}, ack) => {
+            try {
+                const room = socket.data.warRoom || normalizeRoomName(resolveWarRoomIdFromApiKey(socket.data.apiKey));
+                const validation = validateWarRoomMessage(payload?.content);
+
+                if (!room) {
+                    const message = "Join a war room before sending messages";
+                    if (typeof ack === "function") ack({ success: false, message });
+                    emitSocketError(socket, "VALIDATION_ERROR", message);
+                    return;
+                }
+
+                if (!validation.valid) {
+                    const message = validation.message || "Invalid message";
+                    if (typeof ack === "function") ack({ success: false, message });
+                    emitSocketError(socket, "VALIDATION_ERROR", message);
+                    return;
+                }
+
+                if (!socket.rooms.has(room)) {
+                    const message = "Socket is not in the war room";
+                    if (typeof ack === "function") ack({ success: false, message });
+                    emitSocketError(socket, "VALIDATION_ERROR", message);
+                    return;
+                }
+
+                const savedMessage = await saveWarRoomMessage({
+                    roomId: room,
+                    content: validation.value,
+                    apiKey: socket.data.apiKey,
+                });
+
+                const messagePayload = toMessagePayload(savedMessage);
+                ioInstance.to(room).emit("chat:message", messagePayload);
+                console.log(`[Socket] chat:message room=${room} socket=${socket.id}`);
+
+                if (typeof ack === "function") {
+                    ack({ success: true, message: messagePayload });
+                }
+            } catch (error) {
+                const message = error?.message || "Failed to send chat message";
+                console.error("[Socket] chat:message error:", message);
+                if (typeof ack === "function") ack({ success: false, message });
+                emitSocketError(socket, "VALIDATION_ERROR", message);
             }
         });
 
-        // ── Disconnect: clean up all rooms this socket was in ─────────────────
+        // Legacy alias kept so older clients do not break.
+        // We immediately route it through the canonical war room join.
+        socket.on("join_room", (roomName, ack) => {
+            console.log(`[Socket] join_room is deprecated; routing to join_warroom (${normalizeRoomName(roomName) || "api-key room"})`);
+            return handleJoinWarroom(null, ack);
+        });
+
+        // Keep presence counts in sync when the socket disconnects.
         socket.on("disconnect", (reason) => {
             console.log(`[Socket] Disconnected: ${socket.id} (${reason})`);
+            const rooms = getRoomsForSocket(socket.id);
 
-            roomPresence.forEach((members, room) => {
-                if (members.has(socket.id)) {
-                    members.delete(socket.id);
-                    ioInstance.to(room).emit("room:presence", { room, count: members.size });
-                }
+            rooms.forEach((room) => {
+                const count = removeUser(room, socket.id);
+                ioInstance.to(room).emit("room:presence", { room, count });
             });
         });
     });
@@ -118,7 +215,6 @@ export const getIo = () => ioInstance;
  * @returns {number}
  */
 export const getRoomPresenceCount = (roomName) => {
-    const room = roomName?.trim().toLowerCase();
-    return roomPresence.get(room)?.size ?? 0;
+    const room = normalizeRoomName(roomName);
+    return getCount(room);
 };
-
