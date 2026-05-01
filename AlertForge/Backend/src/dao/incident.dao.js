@@ -16,3 +16,24 @@ export const createIncidentDAO = async (data) => {
 export const getAllIncidentsDAO = async () => {
     return await incidentModel.find().sort({ createdAt: -1 });
 };
+/**  
+ * @description DAO function to retrieve a single incident by its ID from the database
+ * @param {string} id - The ID of the incident to retrieve
+ * @returns {Object} The incident document from the database, or null if not found
+ */
+export const getIncidentByIdDAO = async (id) => {
+    return await incidentModel.findById(id);
+};
+/**  
+ * @description DAO function to update the status of an incident in the database
+ * @param {string} id - The ID of the incident to update
+ * @param {string} status - The new status to set for the incident
+ * @returns {Object} The updated incident document from the database, or null if not found
+ */
+export const updateIncidentStatusDAO = async (id, status) => {
+    return await incidentModel.findByIdAndUpdate(
+        id,
+        { status },
+        { returnDocument: "after" }
+    );
+};

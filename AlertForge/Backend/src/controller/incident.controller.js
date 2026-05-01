@@ -1,4 +1,4 @@
-import { createIncidentService, getAllIncidentsService } from "../services/incident.service.js";
+import { createIncidentService, getAllIncidentsService, getIncidentByIdService, updateIncidentStatusService } from "../services/incident.service.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
@@ -44,7 +44,15 @@ export const createIncident = async (req, res, next) => {
         next(error);
     }
 };
-
+/**  
+ * @description Controller function to retrieve all incidents
+ * - Calls the service function to get all incidents from the database
+ * - Returns a standardized API response with the list of incidents
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object used to send the API response
+ * @param {Function} next - Express next function for error handling
+ * @returns {Object} API response with status code, message, and list of incidents
+ */
 export const getAllIncidents = async (req, res, next) => {
     try {
         const incidents = await getAllIncidentsService();
@@ -55,6 +63,62 @@ export const getAllIncidents = async (req, res, next) => {
             incidents
         ));
 
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**  
+ * @description Controller function to retrieve a single incident by its ID
+ * - Extracts the incident ID from the request parameters
+ * - Calls the service function to get the incident from the database
+ * - If the incident is not found, throws a 404 error
+ * - Returns a standardized API response with the incident data if found
+ * @param {Object} req - Express request object containing incident ID in req.params
+ * @param {Object} res - Express response object used to send the API response
+ * @param {Function} next - Express next function for error handling
+ * @returns {Object} API response with status code, message, and incident data if found
+ */
+export const getIncidentById = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const incident = await getIncidentByIdService(id);
+
+        if (!incident) {
+            throw new ApiError(404, "Incident not found");
+        }
+
+        return res.json(new ApiResponse(200, "Incident fetched", incident));
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+/**  
+ * @description Controller function to update the status of an incident
+ * - Extracts the incident ID from the request parameters and new status from the request body
+ * - Calls the service function to update the incident status in the database
+ * - If the incident is not found, throws a 404 error
+ * - Returns a standardized API response with the updated incident data if found
+ * @param {Object} req - Express request object containing incident ID in req.params and new status in req.body
+ * @param {Object} res - Express response object used to send the API response
+ * @param {Function} next - Express next function for error handling
+ * @returns {Object} API response with status code, message, and updated incident data if found
+ */
+export const updateIncidentStatus = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const updated = await updateIncidentStatusService(id, status);
+
+        if (!updated) {
+            throw new ApiError(404, "Incident not found");
+        }
+
+        return res.json(new ApiResponse(200, "Incident updated", updated));
     } catch (error) {
         next(error);
     }
