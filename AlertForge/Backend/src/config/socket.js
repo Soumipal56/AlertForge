@@ -37,6 +37,8 @@ const toMessagePayload = (message) => ({
     id: message?._id?.toString?.() || message?.id || null,
     roomId: message?.roomId,
     content: message?.content,
+    fileUrl: message?.fileUrl,
+    fileType: message?.fileType,
     sender: message?.sender,
     createdAt: message?.createdAt,
     updatedAt: message?.updatedAt,
@@ -247,7 +249,7 @@ export const initSocket = (httpServer) => {
                     return;
                 }
 
-                if (!validation.valid) {
+                if (!validation.valid && !payload?.fileUrl) {
                     const message = validation.message || "Invalid message";
                     if (typeof ack === "function") ack({ success: false, message });
                     emitSocketError(socket, "VALIDATION_ERROR", message);
@@ -276,7 +278,9 @@ export const initSocket = (httpServer) => {
 
                 const savedMessage = await saveWarRoomMessage({
                     roomId: room,
-                    content: validation.value,
+                    content: payload?.content,
+                    fileUrl: payload?.fileUrl,
+                    fileType: payload?.fileType,
                     apiKey: socket.data.apiKey,
                     user: socket.data.user,
                 });

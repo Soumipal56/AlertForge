@@ -3,6 +3,7 @@ import cors from 'cors'
 import morgan from 'morgan'
 import incidentRouter from "./routes/incident.routes.js";
 import apiKeyRouter from "./routes/apikey.routes.js";
+import uploadRouter from "./routes/upload.routes.js";
 
 const app = express();
 app.use(morgan('dev'));
@@ -21,6 +22,7 @@ app.get(`/`, (req, res) => {
 })
 app.use(`/api/apikeys`, apiKeyRouter)
 app.use(`/api/incidents`, incidentRouter)
+app.use(`/api`, uploadRouter)
 
 
 export default app;

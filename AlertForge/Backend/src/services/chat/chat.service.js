@@ -60,19 +60,23 @@ export const validateMessage = (content) => {
 
 /**
  * Persists a validated war room message.
- * @param {{ roomId: string, content: string, apiKey: Object, user: Object }} params
+ * @param {{ roomId: string, content: string, fileUrl?: string, fileType?: string, apiKey: Object, user: Object }} params
  * @returns {Promise<Object>}
  */
-export const saveMessage = async ({ roomId, content, apiKey, user }) => {
-    const validation = validateMessage(content);
+export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, user }) => {
+    // If we have a file, we don't strictly require text content.
+    const validation = validateMessage(content || "");
 
-    if (!validation.valid) {
+    // Only throw if there's no file AND the content is invalid (e.g. empty).
+    if (!validation.valid && !fileUrl) {
         throw new Error(validation.message);
     }
 
     return await createWarRoomMessageDAO({
         roomId,
-        content: validation.value,
+        content: validation.value || "",
+        fileUrl,
+        fileType,
         sender: buildSenderIdentity(apiKey, user),
     });
 };

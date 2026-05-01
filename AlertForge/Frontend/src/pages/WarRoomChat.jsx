@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { getSocket, initializeSocket, reinitializeSocket } from "@/services/socket";
+import UpdateFeed from "@/components/warroom/UpdateFeed";
+import UpdateComposer from "@/components/warroom/UpdateComposer";
 
 /**
  * Normalizes a message from the socket payload or the Mongo history payload.
@@ -10,6 +12,8 @@ const normalizeMessage = (message) => ({
     id: message?.id || message?._id,
     roomId: message?.roomId,
     content: message?.content,
+    fileUrl: message?.fileUrl,
+    fileType: message?.fileType,
     sender: {
         apiKeyId: message?.sender?.apiKeyId || "",
         name: message?.sender?.name || "Unknown",
@@ -30,6 +34,7 @@ function WarRoomChat() {
     const [presence, setPresence] = useState(0);
     const [socketStatus, setSocketStatus] = useState("disconnected");
     const [messageInput, setMessageInput] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState("");
 
     const sortedMessages = useMemo(() => messages, [messages]);
@@ -121,7 +126,7 @@ function WarRoomChat() {
         socket.on("disconnect", handleDisconnect);
         socket.on("room:presence", handlePresence);
         socket.on("chat:message", handleChatMessage);
-        socket.on("chat:error", handleChatError);
+        socket.on("error:event", handleChatError);
         socket.on("incident:resolved", handleIncidentResolved);
 
         if (socket.connected) {
@@ -133,7 +138,7 @@ function WarRoomChat() {
             socket.off("disconnect", handleDisconnect);
             socket.off("room:presence", handlePresence);
             socket.off("chat:message", handleChatMessage);
-            socket.off("chat:error", handleChatError);
+            socket.off("error:event", handleChatError);
             socket.off("incident:resolved", handleIncidentResolved);
         };
     }, [activeApiKey, params.incidentId, activeName]);
@@ -183,6 +188,59 @@ function WarRoomChat() {
 
             setMessageInput("");
         });
+    };
+
+    /**
+     * Handles file selection and uploads it to the backend.
+     * On success, emits a chat:message event with the file URL and type.
+     */
+    const handleFileChange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (incidentStatus === "resolved") {
+            setError("This incident is resolved. You cannot upload files.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            setIsUploading(true);
+            setError("");
+
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/upload`, {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || "Upload failed");
+            }
+
+            // Send via socket
+            const socket = getSocket() || initializeSocket(activeApiKey.trim(), activeName.trim());
+            socket.emit("chat:message", {
+                content: "",
+                fileUrl: data.url,
+                fileType: data.fileType,
+            }, (ack) => {
+                if (!ack?.success) {
+                    setError(ack?.message || "Failed to send file message");
+                }
+            });
+
+        } catch (err) {
+            console.error("[Upload] Error:", err.message);
+            setError(err.message || "Failed to upload file.");
+        } finally {
+            setIsUploading(false);
+            // Reset file input
+            event.target.value = "";
+        }
     };
 
     return (
@@ -281,58 +339,25 @@ function WarRoomChat() {
 
                         {/* Messages Area */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            <div className="mx-auto max-w-3xl space-y-4">
-                                {sortedMessages.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                                        <div className="mb-4 text-3xl opacity-20">💬</div>
-                                        <p className="text-slate-500">No messages yet. Start the conversation!</p>
-                                    </div>
-                                ) : (
-                                    sortedMessages.map((message) => (
-                                        <article key={message.id} className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                                            <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
-                                                <span className="font-medium text-slate-200">{message.sender?.name || "Unknown"}</span>
-                                                <span>{new Date(message.createdAt).toLocaleTimeString()}</span>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-300">{message.content}</p>
-                                        </article>
-                                    ))
-                                )}
-                            </div>
+                            <UpdateFeed messages={sortedMessages} />
                         </div>
 
-                        {/* Chat Input */}
-                        <div className="border-t border-white/5 bg-black/40 p-6">
-                            <form onSubmit={handleSendMessage} className="mx-auto max-w-3xl">
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={messageInput}
-                                        onChange={(event) => setMessageInput(event.target.value)}
-                                        placeholder={
-                                            !roomId 
-                                                ? "Join a room to chat" 
-                                                : incidentStatus === "resolved" 
-                                                    ? "Incident resolved (Read-only)" 
-                                                    : "Type your message..."
-                                        }
-                                        disabled={!roomId || incidentStatus === "resolved"}
-                                        className={`w-full rounded-2xl border border-white/10 bg-black/30 py-4 pl-6 pr-16 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-white/20 ${
-                                            (!roomId || incidentStatus === "resolved") ? "cursor-not-allowed opacity-50" : ""
-                                        }`}
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={!roomId || incidentStatus === "resolved"}
-                                        className={`absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black transition hover:bg-slate-200 ${
-                                            (!roomId || incidentStatus === "resolved") ? "cursor-not-allowed opacity-50" : ""
-                                        }`}
-                                    >
-                                        <span className="text-lg">↵</span>
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        {/* Chat Input Area */}
+                        <UpdateComposer 
+                            messageInput={messageInput}
+                            setMessageInput={setMessageInput}
+                            onSendMessage={() => handleSendMessage({ preventDefault: () => {} })}
+                            onFileChange={handleFileChange}
+                            isUploading={isUploading}
+                            disabled={!roomId || incidentStatus === "resolved"}
+                            placeholder={
+                                !roomId 
+                                    ? "Join a room to chat" 
+                                    : incidentStatus === "resolved" 
+                                        ? "Incident resolved (Read-only)" 
+                                        : "Type your message..."
+                            }
+                        />
                     </section>
                 </div>
             </div>
