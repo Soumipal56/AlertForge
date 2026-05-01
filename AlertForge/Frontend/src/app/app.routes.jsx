@@ -2,9 +2,10 @@ import { createBrowserRouter } from "react-router";
 import Landing from "@/features/landing/Landing";
 import WarRoom from "@/pages/WarRoom";
 import WarRoomChat from "@/pages/WarRoomChat";
+import LoginPage from "@/features/pages/auth/Login";
+import RegisterPage from "@/features/pages/auth/Register";
 
 export const routes = createBrowserRouter([
-
   {
     path: "/create-incident",
     element: <WarRoom />,
@@ -16,5 +17,13 @@ export const routes = createBrowserRouter([
   {
     path: "/",
     element: <Landing />,
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
   },
 ]);
