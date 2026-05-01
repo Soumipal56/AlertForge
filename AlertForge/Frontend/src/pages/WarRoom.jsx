@@ -19,8 +19,6 @@ const statusStyles = {
     resolved: "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
 };
 
-const API_KEY_STORAGE_KEY = "alertforge_api_key";
-
 const normalizeIncident = (incident) => ({
     id: incident?.id || incident?._id,
     message: incident?.message,
@@ -68,19 +66,6 @@ function WarRoom() {
     const sortedIncidents = useMemo(() => incidents, [incidents]);
 
     useEffect(() => {
-        const savedApiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
-        if (savedApiKey) {
-            setApiKey(savedApiKey);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (apiKey.trim()) {
-            window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
-        }
-    }, [apiKey]);
-
-    useEffect(() => {
         if (!apiKey.trim()) {
             setLoading(false);
             return;
@@ -102,19 +87,16 @@ function WarRoom() {
         fetchData();
     }, [apiKey]);
 
-    // Re-initialize the socket (with the new API key in the handshake) whenever
-    // the key changes. The new socket is created in reinitializeSocket().
     useEffect(() => {
         if (!apiKey.trim()) return;
-        reinitializeSocket();
+        reinitializeSocket(apiKey.trim());
     }, [apiKey]);
 
     useEffect(() => {
-        const socket = initializeSocket();
+        const socket = initializeSocket(apiKey.trim());
 
         const handleConnect = () => {
             setSocketStatus("connected");
-            // Re-join active room after reconnect
             if (activeRoom) {
                 socket.emit("join_room", activeRoom);
             }
@@ -190,14 +172,13 @@ function WarRoom() {
             socket.off("incident:update", handleIncidentUpdate);
             socket.off("timeline:event", handleTimelineEvent);
         };
-    }, [activeRoom]);
+    }, [activeRoom, apiKey]);
 
     const handleInputChange = (event) => {
         const { name, value } = event.target;
         setForm((current) => ({ ...current, [name]: value }));
     };
 
-    // When the user enters a service name, auto-join that War Room
     const handleServiceChange = (event) => {
         const { value } = event.target;
         setForm((current) => ({ ...current, service: value }));
@@ -205,7 +186,10 @@ function WarRoom() {
         if (value.trim()) {
             const room = value.trim().toLowerCase();
             setActiveRoom(room);
-            const socket = initializeSocket();
+            if (!apiKey.trim()) {
+                return;
+            }
+            const socket = initializeSocket(apiKey.trim());
             if (socket.connected) {
                 socket.emit("join_room", room);
             }
@@ -229,7 +213,8 @@ function WarRoom() {
                     message: form.message,
                     service: form.service,
                     severity: form.severity,
-                }
+                },
+                apiKey.trim()
             );
 
             setForm(initialFormState);
@@ -247,7 +232,7 @@ function WarRoom() {
                 return;
             }
 
-            await updateIncidentStatus(incidentId, "resolved");
+            await updateIncidentStatus(incidentId, "resolved", apiKey.trim());
         } catch (statusError) {
             setError(statusError?.response?.data?.message || statusError?.message || "Failed to update incident");
         }
@@ -352,12 +337,9 @@ function WarRoom() {
                                     name="apiKey"
                                     value={apiKey}
                                     onChange={(event) => setApiKey(event.target.value)}
-                                    placeholder="x-api-key (saved in browser)"
+                                    placeholder="x-api-key"
                                     className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
                                 />
-                                <p className="text-xs text-slate-500">
-                                    The key is stored locally so the dashboard can fetch incidents again after refresh.
-                                </p>
                                 <input
                                     type="text"
                                     name="message"

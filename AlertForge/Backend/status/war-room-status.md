@@ -4,116 +4,107 @@ _Last updated: 2026-05-01_
 
 ---
 
-## ✅ DONE
+## 1. ✅ Working Features
 
 | Feature | Where |
 | :--- | :--- |
-| Live incident list (socket-driven) | `WarRoom.jsx` — `handleNewIncident` |
-| Incident deduplication / upsert | `WarRoom.jsx` — `upsertIncident()` |
-| Live status update | `WarRoom.jsx` — `handleIncidentUpdate` |
-| Timeline event log | `WarRoom.jsx` — `handleTimelineEvent` |
-| Quick resolve button | `WarRoom.jsx` — `PATCH /api/incidents/:id/status` |
-| Create incident form | `WarRoom.jsx` — `handleCreateIncident` |
-| API key input (saved to localStorage) | `WarRoom.jsx` — `API_KEY_STORAGE_KEY` |
-| Socket handshake auth (API key) | `services/socket.js` — `auth: { token }` |
-| Socket reinitialization on key change | `WarRoom.jsx` — `reinitializeSocket()` |
-| Auto `join_room` on service input | `WarRoom.jsx` — `handleServiceChange` |
-| Responder online count | `WarRoom.jsx` — `room:presence` listener |
-| Active War Room name display | `WarRoom.jsx` — `activeRoom` state |
-| Socket status indicator (green/red) | `WarRoom.jsx` — conditional className |
-| Incident severity + status badges | `WarRoom.jsx` — `severityStyles`, `statusStyles` |
+| Fetch all incidents on load | `WarRoom.jsx` → `GET /api/incidents` with `x-api-key` |
+| Create incident via form | `WarRoom.jsx` → `POST /api/incidents` with `x-api-key` |
+| Quick resolve button | `WarRoom.jsx` → `PATCH /api/incidents/:id/status` |
+| Live `incident:new` → prepend to list | `WarRoom.jsx` `handleNewIncident` + `upsertIncident` |
+| Live `incident:update` → update card in-place | `WarRoom.jsx` `handleIncidentUpdate` + `upsertIncident` |
+| Timeline event log (in-memory) | `WarRoom.jsx` `handleTimelineEvent` |
+| Socket auth via API key handshake | `services/socket.js` → `auth: { token: apiKey }` |
+| Socket reinitialization on key change | `WarRoom.jsx` → `reinitializeSocket()` |
+| Auto `join_room` on service name input | `WarRoom.jsx` `handleServiceChange` |
+| Responder count display | `WarRoom.jsx` → `room:presence` listener |
+| Socket status indicator (connected / disconnected) | `WarRoom.jsx` `socketStatus` state |
+| War room chat (separate page) | `WarRoomChat.jsx` → full send/receive + history on join |
+| Chat persisted to MongoDB | `warRoomChat.service.js` → `WarRoomMessage` model |
+| Chat history on join | `join_warroom` ack returns last 50 messages |
 
 ---
 
-## ⚠️ PARTIAL
+## 2. ⚠️ Partial
 
 | Feature | Issue |
 | :--- | :--- |
-| API key auth for create/resolve | Key read from localStorage but not re-validated on every action — relies on server-side middleware |
-| Incident re-fetch on key change | `getIncidents(apiKey)` is called but signature doesn't pass key — interceptor handles it from localStorage |
+| Timeline | Local state only — lost on page refresh, not stored in DB |
+| War room chat in `WarRoom.jsx` | Not connected — `WarRoom.jsx` uses `join_room`, not `join_warroom`; chat system only works in `WarRoomChat.jsx` |
+| Incident re-fetch scope | `GET /api/incidents` returns ALL incidents — not filtered by service or room |
 
 ---
 
-## ❌ NOT DONE
+## 3. ❌ Not Working / Missing
 
 | Feature |
 | :--- |
-| War Room chat / messaging |
-| Typing indicator |
+| Chat panel inside `WarRoom.jsx` dashboard |
+| Shared socket instance between `WarRoom.jsx` and `WarRoomChat.jsx` |
 | Persistent timeline (DB-backed) |
-| Responder assignment ("I'm on it" claim) |
+| Filter incidents by severity / service |
+| Responder assignment ("I'm on it") |
 | SLA / time-to-resolve timer |
-| Filter incidents by severity or service |
-| Pagination / infinite scroll |
-| Incident detail / drill-down page |
+| Pagination / infinite scroll for incidents |
+| Incident detail drill-down page |
+| Redis adapter (multi-server socket routing) |
+| CORS origin from env (currently hardcoded to `localhost:5173`) |
 
 ---
 
-## 🔄 WAR ROOM DATA FLOW
+## 4. 🔄 War Room Flow
 
-```mermaid
-flowchart TD
-    User[User opens WarRoom]
+```
+User enters API key
+  → initializeSocket(apiKey) sends it in handshake auth
+  → Backend io.use: hashKey(token) → DB lookup → socket.data.apiKey set
 
-    User -->|1 enter API key| LS[localStorage]
-    User -->|2 type service name| JR[emit join_room]
+User types service name in form
+  → handleServiceChange → setActiveRoom(service.toLowerCase())
+  → socket.emit("join_room", service)     ← WarRoom.jsx path
+  OR
+  → socket.emit("join_warroom")           ← WarRoomChat.jsx path
+      → Backend resolves room = apiKey.serviceName || name || id
+      → returns last 50 messages in ack
 
-    subgraph Boot
-        LS -->|apiKey in localStorage| SS["socket.js<br/>auth.token = apiKey"]
-        SS -->|WebSocket handshake| BE["Backend io.use middleware"]
-        BE -->|validated| SIO[Socket.io Server]
-    end
+Events flow
+  POST /api/incidents
+    → controller saves to DB
+    → emitNewIncident → io.to(service room) → "incident:new"
+    → emitTimelineEvent → "timeline:event"
+    → WarRoom.jsx upserts incident + appends timeline item
 
-    subgraph REST
-        LS -->|x-api-key interceptor| AX[axios]
-        AX -->|GET /api/incidents| IC[Incident Controller]
-        IC -->|fetch all| DB[(MongoDB)]
-        DB -->|incident list| IC
-        IC -->|JSON response| AX
-        AX --> WR[WarRoom state]
-    end
+  PATCH /api/incidents/:id/status
+    → controller updates DB
+    → emitIncidentUpdate → "incident:update"
+    → emitTimelineEvent → "timeline:event"
+    → WarRoom.jsx updates existing card
 
-    JR --> SIO
-    SIO -->|room:presence count| WR
-
-    subgraph LiveUpdates
-        SIO -->|incident:new| WR
-        SIO -->|incident:update| WR
-        SIO -->|timeline:event| WR
-    end
-
-    WR -->|render| UI[Live Dashboard]
+  User sends chat message (WarRoomChat.jsx only)
+    → socket.emit("chat:message", { content })
+    → Backend saves to MongoDB
+    → io.to(room).emit("chat:message", savedMessage)
+    → all room members receive it live
 ```
 
 ---
 
-## 🖥️ UI COMPONENT BREAKDOWN
+## 5. 🧠 Issues Found
 
-```mermaid
-flowchart LR
-    WR[WarRoom Page]
-
-    WR --> Header["Header Bar<br/>socket status - war room name<br/>responders online - incident count"]
-    WR --> Left["Incidents Panel<br/>article per incident<br/>severity + status badge<br/>quick resolve button"]
-    WR --> Right[Sidebar]
-
-    Right --> Form["Create Incident Form<br/>api key - message - service - severity"]
-    Right --> Timeline["Timeline Log<br/>live socket event feed"]
-```
+- **Split socket usage**: `WarRoom.jsx` uses `join_room` (generic). `WarRoomChat.jsx` uses `join_warroom` (war room–scoped). These two are disconnected — a user on the main dashboard won't receive chat messages.
+- **No localStorage**: Old docs said API key is saved to localStorage. **This is incorrect** — current `WarRoom.jsx` keeps apiKey in plain React state only. It resets on refresh.
+- **Timeline not persisted**: Timeline items are built from live socket events. Refreshing the page clears the entire timeline.
+- **No filtering on incident list**: `GET /api/incidents` returns all incidents regardless of service. UI shows everything, even incidents from other services.
+- **CORS hardcoded**: `config/socket.js` has `origin: "http://localhost:5173"` — will break in production or on any other port.
+- **`services/chat/` is empty**: directory exists but has no files — dead folder.
 
 ---
 
-## 📊 STATE MAP
+## 6. 🛠️ Fix Plan
 
-| State | Type | Updated By |
-| :--- | :--- | :--- |
-| `incidents` | `Incident[]` | REST fetch + `incident:new` + `incident:update` |
-| `timeline` | `TimelineItem[]` | `incident:new`, `incident:update`, `timeline:event` |
-| `socketStatus` | `"connected" \| "disconnected"` | socket `connect` / `disconnect` |
-| `activeRoom` | `string` | `handleServiceChange` |
-| `roomPresence` | `number` | `room:presence` event |
-| `apiKey` | `string` | localStorage + form input |
-| `form` | `{ message, service, severity }` | controlled inputs |
-| `creating` | `boolean` | form submit lifecycle |
-| `loading` | `boolean` | REST fetch lifecycle |
-| `error` | `string` | any failed action |
+- Step 1 → Add a shared socket context (React Context or Zustand) so `WarRoom.jsx` and `WarRoomChat.jsx` share one socket instance
+- Step 2 → Switch `WarRoom.jsx` to call `join_warroom` instead of `join_room` to align with the chat system
+- Step 3 → Persist timeline events to a `TimelineEvent` MongoDB collection; load on page open
+- Step 4 → Add service-filter query param to `GET /api/incidents` so each war room only sees its own incidents
+- Step 5 → Move CORS origin to `CORS_ORIGIN` env variable
+- Step 6 → Implement `join_warroom` equivalent in `WarRoom.jsx` or merge chat panel into the main dashboard

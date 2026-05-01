@@ -1,23 +1,30 @@
 import { io } from "socket.io-client";
 
-const API_KEY_STORAGE_KEY = "alertforge_api_key";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3000";
 
 let socketInstance = null;
+let socketApiKey = "";
 
 /**
  * @description Initializes (or returns the existing) Socket.io client.
- * Passes the stored API key in the handshake `auth.token` field so the
+ * Passes the current API key in the handshake `auth.token` field so the
  * backend middleware can validate it before the connection is opened.
+ * @param {string} apiKey
  * @returns {import("socket.io-client").Socket}
  */
-export const initializeSocket = () => {
-    if (socketInstance?.connected) {
+export const initializeSocket = (apiKey = "") => {
+    const normalizedKey = typeof apiKey === "string" ? apiKey.trim() : "";
+
+    if (socketInstance?.connected && normalizedKey === socketApiKey) {
         return socketInstance;
     }
 
-    // Always read the latest key in case the user just entered it
-    const apiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+    if (socketInstance) {
+        socketInstance.disconnect();
+        socketInstance = null;
+    }
+
+    socketApiKey = normalizedKey;
 
     socketInstance = io(SOCKET_URL, {
         reconnection: true,
@@ -26,7 +33,7 @@ export const initializeSocket = () => {
         transports: ["websocket", "polling"],
         autoConnect: true,
         auth: {
-            token: apiKey,
+            token: normalizedKey,
         },
     });
 
@@ -55,11 +62,12 @@ export const disconnectSocket = () => {
 /**
  * @description Tears down the existing socket and creates a fresh one.
  * Use when the user updates their API key so the new key is sent in auth.
+ * @param {string} apiKey
  * @returns {import("socket.io-client").Socket}
  */
-export const reinitializeSocket = () => {
+export const reinitializeSocket = (apiKey = "") => {
     disconnectSocket();
-    return initializeSocket();
+    return initializeSocket(apiKey);
 };
 
 /**
@@ -67,4 +75,3 @@ export const reinitializeSocket = () => {
  * @returns {import("socket.io-client").Socket|null}
  */
 export const getSocket = () => socketInstance;
-

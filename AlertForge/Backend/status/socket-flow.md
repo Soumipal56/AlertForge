@@ -4,206 +4,124 @@ _Last updated: 2026-05-01_
 
 ---
 
-## 🏗️ IMPLEMENTATION STATUS
+## 1. ✅ Current Implementation
 
-| Feature | Status |
-| :--- | :--- |
-| Socket.io server (`initSocket`) | ✅ |
-| Singleton pattern (`getIo`) | ✅ |
-| CORS config | ✅ |
-| Auth middleware (`io.use`) | ✅ |
-| API key validation in socket auth | ✅ |
-| `join_room` handler | ✅ |
-| `leave_room` handler | ✅ |
-| Responder presence tracking | ✅ |
-| `room:presence` broadcast | ✅ |
-| `incident:new` emit | ✅ |
-| `incident:update` emit | ✅ |
-| `timeline:event` emit | ✅ |
-| Room-scoped emit (service filter) | ✅ |
-| Global fallback emit | ✅ |
-| Frontend handshake auth (`auth.token`) | ✅ |
-| Frontend `join_room` on service input | ✅ |
-| Frontend socket reinitialization on key change | ✅ |
-| Redis adapter (multi-server) | ❌ |
-| War Room chat | ❌ |
-| Persistent presence (DB-backed) | ❌ |
+- socket setup (`initSocket` / `getIo`) → ✅ live in `src/config/socket.js`
+- auth middleware (`io.use`) → ✅ hashes token, validates against DB
+- `join_room` / `leave_room` events → ✅ with presence tracking
+- `join_warroom` (dedicated war room join) → ✅ resolves room from API key, loads history
+- `chat:message` (real-time chat) → ✅ saved to MongoDB, broadcast to room
+- `room:presence` broadcast → ✅ on join, leave, disconnect
+- `incident:new` emit → ✅ fired from `incident.controller` after DB save
+- `incident:update` emit → ✅ fired from `incident.controller` after status change
+- `timeline:event` emit → ✅ fired for `incident.created` and `incident.status_changed`
+- room-scoped emit (by service name) → ✅ falls back to global if no service
+- Redis adapter (multi-server) → ❌ not implemented
+- Persistent presence (DB-backed) → ❌ in-memory only
 
 ---
 
-## 1️⃣ CONNECTION & AUTH FLOW
+## 2. 🔄 Actual Flow (REAL CODE FLOW)
 
-```mermaid
-sequenceDiagram
-    participant FE as Frontend WarRoom
-    participant SC as socket.js client
-    participant SMW as io.use middleware
-    participant DB as MongoDB ApiKey
-    participant SIO as SocketIO Server
+### Connection Flow
 
-    FE->>SC: reinitializeSocket()
-    SC->>SIO: io(url, auth token)
-    SIO->>SMW: intercept before connection
-    SMW->>DB: findActiveApiKeyByHashedKey
-    alt Valid Key
-        DB-->>SMW: ApiKey doc
-        SMW->>SIO: next() OK
-        SIO-->>FE: socket.id assigned
-        FE->>SIO: emit join_room payment-gateway
-        SIO-->>FE: emit room:presence count
-    else Invalid Key
-        DB-->>SMW: null
-        SMW->>SIO: next Error Authentication error
-        SIO-->>FE: connect_error fired
-    end
+```
+Frontend (WarRoom.jsx / WarRoomChat.jsx)
+  → initializeSocket(apiKey)           [services/socket.js]
+  → io(SOCKET_URL, { auth: { token: apiKey } })
+  → Backend io.use middleware          [config/socket.js]
+  → hashKey(token) → findActiveApiKeyByHashedKeyDAO()
+  → if valid: socket.data.apiKey set, next() called
+  → if invalid: connect_error fired on client
+```
+
+### Create Incident Flow
+
+```
+POST /api/incidents (x-api-key header)
+  → apiKey.middleware validates key via DB
+  → incident.controller → createIncidentService → MongoDB save
+  → emitNewIncident(incident)          [socket.service.js]
+      → io.to(service.lowercase) OR io (global fallback)
+      → emits "incident:new" payload
+  → emitTimelineEvent({ type: "incident.created", incident })
+      → emits "timeline:event"
+  → 201 response to caller
+```
+
+### Update Incident Flow
+
+```
+PATCH /api/incidents/:id/status (x-api-key header)
+  → apiKey.middleware validates key via DB
+  → incident.controller → updateIncidentStatusService → MongoDB update
+  → emitIncidentUpdate(updated)        [socket.service.js]
+      → emits "incident:update" to service room / global
+  → emitTimelineEvent({ type: "incident.status_changed", incident })
+      → emits "timeline:event"
+  → 200 response to caller
+```
+
+### War Room Chat Flow
+
+```
+Frontend (WarRoomChat.jsx)
+  → reinitializeSocket(apiKey)
+  → on connect: emit "join_warroom" (no payload needed)
+  → Backend resolves room = apiKey.serviceName || apiKey.name || apiKey.id
+  → loads last 50 messages from MongoDB (WarRoomMessage collection)
+  → ack returns { success, room, count, messages[] }
+  → user types: emit "chat:message", { content }
+  → Backend saves to MongoDB via saveWarRoomMessage()
+  → io.to(room).emit("chat:message", savedMessage)
+  → all clients in room receive live update
 ```
 
 ---
 
-## 2️⃣ CREATE INCIDENT FLOW
+## 3. 📡 Events
 
-```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant MW as apiKey.middleware
-    participant CTL as incident.controller
-    participant SVC as incident.service
-    participant DB as MongoDB
-    participant SS as socket.service
-    participant NS as notification.service
-    participant SIO as SocketIO Server
-
-    FE->>MW: POST /api/incidents x-api-key
-    MW->>DB: findActiveApiKeyByHashedKey
-    DB-->>MW: valid key
-    MW->>CTL: next()
-    CTL->>SVC: createIncidentService
-    SVC->>DB: incidentModel.create
-    DB-->>SVC: incident doc
-    CTL-->>NS: sendIncidentNotification fire and forget
-    CTL->>SS: emitNewIncident
-    SS->>SIO: io.to service emit incident:new
-    SIO-->>FE: incident:new received
-    CTL->>SS: emitTimelineEvent incident.created
-    SS->>SIO: io.to service emit timeline:event
-    SIO-->>FE: timeline:event received
-    CTL-->>FE: 201 Created
-```
-
----
-
-## 3️⃣ UPDATE INCIDENT FLOW
-
-```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant MW as apiKey.middleware
-    participant CTL as incident.controller
-    participant DB as MongoDB
-    participant SS as socket.service
-    participant SIO as SocketIO Server
-
-    FE->>MW: PATCH /api/incidents/:id/status
-    MW->>DB: findActiveApiKeyByHashedKey
-    MW->>CTL: next()
-    CTL->>DB: findByIdAndUpdate
-    DB-->>CTL: updated doc
-    CTL->>SS: emitIncidentUpdate
-    SS->>SIO: io.to service emit incident:update
-    SIO-->>FE: incident:update received
-    CTL->>SS: emitTimelineEvent incident.status_changed
-    SS->>SIO: io.to service emit timeline:event
-    SIO-->>FE: timeline:event received
-    CTL-->>FE: 200 OK
-```
-
----
-
-## 4️⃣ WAR ROOM PRESENCE FLOW
-
-```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant SIO as SocketIO Server
-    participant MAP as roomPresence Map
-
-    FE->>SIO: emit join_room database
-    SIO->>MAP: roomPresence.get database add socketId
-    SIO-->>FE: emit room:presence count 3
-
-    Note over FE: User navigates away
-    FE->>SIO: emit leave_room database
-    SIO->>MAP: roomPresence.get database delete socketId
-    SIO-->>FE: emit room:presence count 2
-
-    Note over SIO: On disconnect
-    SIO->>MAP: clean up all rooms for socketId
-    SIO-->>FE: room:presence updated counts
-```
-
----
-
-## 5️⃣ FULL SYSTEM TOPOLOGY
-
-```mermaid
-flowchart TD
-    subgraph Client["Browser"]
-        WR[WarRoom.jsx]
-        SC["socket.js client"]
-        API["api.js - axios"]
-    end
-
-    subgraph Server["Node.js Server"]
-        MW["REST Middleware<br/>x-api-key"]
-        SMW["Socket Middleware<br/>io.use auth.token"]
-        CTL[Incident Controller]
-        SS["Socket Service<br/>resolveTarget"]
-        SIOC[Socket.io Server]
-        NS["Notification<br/>Email + WhatsApp"]
-        DB[(MongoDB)]
-        MAP["roomPresence<br/>in-memory Map"]
-    end
-
-    WR -->|HTTP REST| API
-    API -->|x-api-key| MW
-    MW --> CTL
-    CTL --> DB
-    CTL -->|fire and forget| NS
-    CTL --> SS
-    SS -->|io.to service room| SIOC
-
-    WR -->|WebSocket| SC
-    SC -->|auth.token| SMW
-    SMW --> DB
-    SMW --> SIOC
-    SIOC --> MAP
-
-    SIOC -->|incident:new| WR
-    SIOC -->|incident:update| WR
-    SIOC -->|timeline:event| WR
-    SIOC -->|room:presence| WR
-```
-
----
-
-## 📦 EVENT REFERENCE
-
-| Event | Direction | Payload | Scope |
+| Event | Direction | Where emitted | Used for |
 | :--- | :--- | :--- | :--- |
-| `incident:new` | Server → Client | `{ id, message, service, severity, status, createdAt, updatedAt }` | Service room / global |
-| `incident:update` | Server → Client | `{ id, message, service, severity, status, createdAt, updatedAt }` | Service room / global |
-| `timeline:event` | Server → Client | `{ type, incident: { ...payload } }` | Service room / global |
-| `room:presence` | Server → Client | `{ room, count }` | Room members |
-| `join_room` | Client → Server | `"service-name"` | — |
-| `leave_room` | Client → Server | `"service-name"` | — |
+| `incident:new` | Server → Client | `socket.service.js` | New incident created |
+| `incident:update` | Server → Client | `socket.service.js` | Incident status changed |
+| `timeline:event` | Server → Client | `socket.service.js` | Activity feed entry |
+| `room:presence` | Server → Client | `config/socket.js` | Responder count update |
+| `join_room` | Client → Server | `config/socket.js` | Join a named room (generic) |
+| `leave_room` | Client → Server | `config/socket.js` | Leave a named room |
+| `join_warroom` | Client → Server | `config/socket.js` | Join service-scoped war room + load history |
+| `chat:message` | Both | `config/socket.js` | Send / receive a chat message |
+| `chat:error` | Server → Client | `config/socket.js` | Chat error feedback |
 
 ---
 
-## ⚠️ KNOWN LIMITATIONS
+## 4. 🔌 Frontend ↔ Backend Connection
 
-| Issue | Impact |
-| :--- | :--- |
-| Presence is in-memory | Resets on server crash/restart |
-| No Redis adapter | Multi-server deploy will break socket routing |
-| No chat events | War Room has no text messaging |
-| CORS hardcoded | Must change before production deploy |
+- **Socket auth**: `initializeSocket(apiKey)` passes `auth: { token: apiKey }` in the handshake. Backend hashes it and checks MongoDB.
+- **API key (REST)**: sent as `x-api-key` header via `api.js` → `withApiKey()` helper. Same key, same validation path.
+- **Room join (WarRoom.jsx)**: when user types a service name → `handleServiceChange` → `socket.emit("join_room", service.toLowerCase())`. Room name = service name lowercased.
+- **Room join (WarRoomChat.jsx)**: on connect → `socket.emit("join_warroom")`. Backend resolves room from API key metadata automatically.
+- **UI updates**: `incident:new` → `upsertIncident()` prepends to list. `incident:update` → same upsert updates existing card. `timeline:event` → prepends to timeline log. `room:presence` → updates responder count badge.
+
+---
+
+## 5. ❌ Missing / Fix Needed
+
+- `WarRoom.jsx` uses `join_room` (generic). It does NOT call `join_warroom`, so it never loads chat history and is not connected to the war room chat system.
+- `WarRoom.jsx` and `WarRoomChat.jsx` are separate pages — there is no shared socket instance between them.
+- `WarRoom.jsx` API key state is plain React state (typed in form). The old doc said "saved to localStorage" — **this is wrong**, no localStorage is used in current code.
+- Timeline in `WarRoom.jsx` is local in-memory state only — not persisted to DB, lost on refresh.
+- CORS origin is hardcoded to `http://localhost:5173` in `config/socket.js`.
+- Presence map is in-memory — resets on server restart.
+- `chat` service directory (`src/services/chat/`) exists but is **empty**.
+- No notification REST endpoint — `sendIncidentNotification` is fire-and-forget, no retry.
+
+---
+
+## 6. 🛠️ Next Steps (SHORT)
+
+- Step 1 → Connect `WarRoom.jsx` to use `join_warroom` so it shares the chat room system
+- Step 2 → Merge `WarRoomChat.jsx` into `WarRoom.jsx` or use a shared socket context
+- Step 3 → Move CORS origin to env variable
+- Step 4 → Add Redis adapter before any horizontal scaling
+- Step 5 → Persist timeline entries in DB (new `TimelineEvent` model)

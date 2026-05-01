@@ -7,33 +7,39 @@ const apiClient = axios.create({
     },
 });
 
-apiClient.interceptors.request.use((config) => {
-    const apiKey = window.localStorage.getItem("alertforge_api_key");
-
-    if (apiKey) {
-        config.headers["x-api-key"] = apiKey;
-    }
-
-    return config;
-});
-
 const unwrapApiResponse = (response) => response.data?.data ?? response.data;
 
-export const getIncidents = async () => {
-    const response = await apiClient.get("/api/incidents");
+const withApiKey = (apiKey, config = {}) => {
+    const nextConfig = {
+        ...config,
+        headers: {
+            ...(config.headers || {}),
+        },
+    };
+
+    if (typeof apiKey === "string" && apiKey.trim()) {
+        nextConfig.headers["x-api-key"] = apiKey.trim();
+    }
+
+    return nextConfig;
+};
+
+export const getIncidents = async (apiKey) => {
+    const response = await apiClient.get("/api/incidents", withApiKey(apiKey));
     return unwrapApiResponse(response);
 };
 
-export const createIncident = async (incidentData) => {
-    const response = await apiClient.post("/api/incidents", incidentData);
+export const createIncident = async (incidentData, apiKey) => {
+    const response = await apiClient.post("/api/incidents", incidentData, withApiKey(apiKey));
 
     return unwrapApiResponse(response);
 };
 
-export const updateIncidentStatus = async (incidentId, status) => {
+export const updateIncidentStatus = async (incidentId, status, apiKey) => {
     const response = await apiClient.patch(
         `/api/incidents/${incidentId}/status`,
-        { status }
+        { status },
+        withApiKey(apiKey)
     );
 
     return unwrapApiResponse(response);
