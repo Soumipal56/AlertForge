@@ -30,11 +30,12 @@ export const resolveIncidentRoomId = (incidentId) => {
 /**
  * Builds a safe sender snapshot for persistence and socket payloads.
  * @param {Object} apiKey
+ * @param {Object} user
  * @returns {{ apiKeyId: string, name: string, serviceName: string }}
  */
-export const buildSenderIdentity = (apiKey = {}) => ({
+export const buildSenderIdentity = (apiKey = {}, user = {}) => ({
     apiKeyId: typeof apiKey.id === "string" ? apiKey.id : "",
-    name: typeof apiKey.name === "string" && apiKey.name.trim() ? apiKey.name.trim() : "Unknown",
+    name: user.name || (typeof apiKey.name === "string" && apiKey.name.trim() ? apiKey.name.trim() : "Unknown"),
     serviceName: typeof apiKey.serviceName === "string" ? apiKey.serviceName.trim() : "",
 });
 
@@ -59,10 +60,10 @@ export const validateMessage = (content) => {
 
 /**
  * Persists a validated war room message.
- * @param {{ roomId: string, content: string, apiKey: Object }} params
+ * @param {{ roomId: string, content: string, apiKey: Object, user: Object }} params
  * @returns {Promise<Object>}
  */
-export const saveMessage = async ({ roomId, content, apiKey }) => {
+export const saveMessage = async ({ roomId, content, apiKey, user }) => {
     const validation = validateMessage(content);
 
     if (!validation.valid) {
@@ -72,7 +73,7 @@ export const saveMessage = async ({ roomId, content, apiKey }) => {
     return await createWarRoomMessageDAO({
         roomId,
         content: validation.value,
-        sender: buildSenderIdentity(apiKey),
+        sender: buildSenderIdentity(apiKey, user),
     });
 };
 

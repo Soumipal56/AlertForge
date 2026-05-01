@@ -69,6 +69,7 @@ export const initSocket = (httpServer) => {
     ioInstance.use(async (socket, next) => {
         try {
             const rawToken = socket.handshake.auth?.token;
+            const rawName = socket.handshake.auth?.name;
 
             if (!rawToken) {
                 return next(new Error("Authentication error: No API key provided"));
@@ -81,10 +82,17 @@ export const initSocket = (httpServer) => {
                 return next(new Error("Authentication error: Invalid or inactive API key"));
             }
 
+            // Store API key metadata for authorization
             socket.data.apiKey = {
                 id: apiKey._id?.toString(),
                 name: apiKey.name,
                 serviceName: apiKey.serviceName,
+            };
+
+            // Store session-based user identity
+            socket.data.user = {
+                name: typeof rawName === "string" ? rawName.trim() : null,
+                nameProvided: !!(typeof rawName === "string" && rawName.trim()),
             };
 
             return next();
@@ -115,7 +123,16 @@ export const initSocket = (httpServer) => {
                 socket.data.warRoom = room;
 
                 const count = addUser(room, socket.id);
+
+                // Assign auto-name ONLY if user did not provide one
+                if (!socket.data.user.nameProvided) {
+                    socket.data.user.name = `User-${count}`;
+                }
+
                 const recentMessages = await getRecentWarRoomMessages(room);
+
+                // Notify others that a new user has joined
+                socket.to(room).emit("user:joined", { name: socket.data.user.name });
 
                 ioInstance.to(room).emit("room:presence", { room, count });
 
@@ -128,7 +145,7 @@ export const initSocket = (httpServer) => {
                     });
                 }
 
-                console.log(`[Socket] ${socket.id} joined war room "${room}" (${count} online)`);
+                console.log(`[Socket] ${socket.id} (${socket.data.user.name}) joined war room "${room}" (${count} online)`);
             } catch (error) {
                 const message = error?.message || "Failed to join war room";
                 if (typeof ack === "function") ack({ success: false, message });
@@ -182,7 +199,16 @@ export const initSocket = (httpServer) => {
 
                 // 4. Update presence and fetch history.
                 const count = addUser(room, socket.id);
+
+                // Assign auto-name ONLY if user did not provide one
+                if (!socket.data.user.nameProvided) {
+                    socket.data.user.name = `User-${count}`;
+                }
+
                 const recentMessages = await getRecentWarRoomMessages(room);
+
+                // Notify others that a new user has joined
+                socket.to(room).emit("user:joined", { name: socket.data.user.name });
 
                 // Notify all members in the room of new presence count.
                 ioInstance.to(room).emit("room:presence", { room, count });
@@ -196,7 +222,7 @@ export const initSocket = (httpServer) => {
                     });
                 }
 
-                console.log(`[Socket] ${socket.id} joined incident room "${room}"`);
+                console.log(`[Socket] ${socket.id} (${socket.data.user.name}) joined incident room "${room}"`);
             } catch (error) {
                 const message = error?.message || "Failed to join incident war room";
                 console.error("[Socket] join_incident_room error:", message);
@@ -238,6 +264,7 @@ export const initSocket = (httpServer) => {
                     roomId: room,
                     content: validation.value,
                     apiKey: socket.data.apiKey,
+                    user: socket.data.user,
                 });
 
                 const messagePayload = toMessagePayload(savedMessage);
@@ -269,6 +296,7 @@ export const initSocket = (httpServer) => {
 
             rooms.forEach((room) => {
                 const count = removeUser(room, socket.id);
+                ioInstance.to(room).emit("user:left", { name: socket.data.user?.name || "Anonymous" });
                 ioInstance.to(room).emit("room:presence", { room, count });
             });
         });

@@ -21,7 +21,9 @@ const normalizeMessage = (message) => ({
 function WarRoomChat() {
     const params = useParams();
     const [apiKeyInput, setApiKeyInput] = useState("");
+    const [nameInput, setNameInput] = useState("");
     const [activeApiKey, setActiveApiKey] = useState("");
+    const [activeName, setActiveName] = useState("");
     const [roomId, setRoomId] = useState("");
     const [messages, setMessages] = useState([]);
     const [presence, setPresence] = useState(0);
@@ -40,7 +42,7 @@ function WarRoomChat() {
             return undefined;
         }
 
-        const socket = reinitializeSocket(activeApiKey.trim());
+        const socket = reinitializeSocket(activeApiKey.trim(), activeName.trim());
         const { incidentId } = params;
 
         // Once the socket connects, join either a specific incident room (if deep-linked)
@@ -122,12 +124,14 @@ function WarRoomChat() {
             socket.off("chat:message", handleChatMessage);
             socket.off("chat:error", handleChatError);
         };
-    }, [activeApiKey, params.incidentId]);
+    }, [activeApiKey, params.incidentId, activeName]);
 
     const handleConnect = (event) => {
         event.preventDefault();
 
         const key = apiKeyInput.trim();
+        const name = nameInput.trim();
+
         if (!key) {
             setError("Enter an API key to join the War Room.");
             return;
@@ -135,12 +139,13 @@ function WarRoomChat() {
 
         setError("");
         setActiveApiKey(key);
+        setActiveName(name);
     };
 
     const handleSendMessage = (event) => {
         event.preventDefault();
 
-        const socket = getSocket() || initializeSocket(activeApiKey.trim());
+        const socket = getSocket() || initializeSocket(activeApiKey.trim(), activeName.trim());
         const content = messageInput.trim();
 
         if (!roomId) {
@@ -197,6 +202,16 @@ function WarRoomChat() {
                         ) : null}
 
                         <form onSubmit={handleConnect} className="mt-5 space-y-4">
+                            <div>
+                                <label className="mb-2 block text-sm text-slate-300">Your Name (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={nameInput}
+                                    onChange={(event) => setNameInput(event.target.value)}
+                                    placeholder="e.g. Ritam"
+                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                                />
+                            </div>
                             <div>
                                 <label className="mb-2 block text-sm text-slate-300">API Key</label>
                                 <input
