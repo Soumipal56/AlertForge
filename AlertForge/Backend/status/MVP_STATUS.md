@@ -4,108 +4,70 @@
 
 ### 1. Core API
 - [x] Express server setup
-- [x] Route structure implemented
+- [x] Route structure implemented (`/api/incidents`)
 - [x] Incident creation API (`POST /api/incidents`)
+- [x] Incident retrieval APIs (`GET /api/incidents`, `GET /api/incidents/:id`)
+- [x] Incident status update API (`PATCH /api/incidents/:id/status`)
 
----
+### 2. Architecture & Design
+- [x] Clean architecture pattern (Controller, Service, DAO, Routes)
+- [x] Constants system (HTTP status, success/error messages, enums)
 
-### 2. Architecture
-- [x] Controller layer
-- [x] Service layer
-- [x] Middleware layer
-- [x] Clean project structure (scalable)
+### 3. Database Layer
+- [x] MongoDB integration & connection setup
+- [x] Mongoose models defined (`Incident.model.js`, `ApiKey.model.js`, `Service.model.js`, `WebhookLog.model.js`)
+- [x] DAO layer implemented for incident CRUD
 
----
-
-### 3. Validation & Error Handling
-- [x] Zod validation for request body
-- [x] Custom ApiError class
-- [x] Custom ApiResponse class
+### 4. Validation & Error Handling
+- [x] Zod validation for incident creation
+- [x] Custom ApiError and ApiResponse classes
 - [x] Centralized error handler middleware
 
----
+### 5. Notification System (Basic)
+- [x] Notification service scaffolding
+- [x] Basic Email integration setup
+- [x] Basic WhatsApp integration setup
 
-### 4. Security (Basic)
-- [x] API Key middleware (`x-api-key`)
-- [x] Unauthorized request handling
-
----
-
-### 5. Constants System
-- [x] HTTP status codes centralized
-- [x] Error messages centralized
-- [x] Success messages centralized
-- [x] Severity & incident status enums
+### 6. Security (Basic)
+- [x] API Key middleware scaffolding (currently hardcoded validation)
 
 ---
 
-### 6. Testing
-- [x] Tested via Postman
-- [x] Valid request flow working
-- [x] Error cases handled
+## 🚧 In Progress
+
+### 1. Security & Authentication
+- [ ] Database-backed API Key validation (replace hardcoded `test_key`)
+- [ ] API Key rotation & revocation mechanisms
+
+### 2. Notification System
+- [ ] Ensure notifications are fully non-blocking and robust (queues/retry mechanism)
+- [ ] Dynamic recipient mapping based on affected service/team
 
 ---
 
-## ❌ Pending Features (To make Production Ready)
+## ❌ Not Started (Critical Path)
 
-### 🔴 Database Layer
-- [ ] MongoDB integration
-- [ ] Mongoose schema for Incident
-- [ ] Replace in-memory DB
-- [ ] Add DAO layer
+### 1. Webhook Ingestion (UptimeRobot, etc.)
+- [ ] Dedicated webhook route & controller (`POST /api/webhooks`)
+- [ ] Webhook signature verification / secret validation
+- [ ] Automatic incident generation from webhook payload
 
----
+### 2. Real-Time Communication (Socket.io)
+- [ ] Socket.io server integration
+- [ ] Emitters for new incidents and status updates (War Room timeline)
+- [ ] Client authentication for secure socket connections
 
-### 🔴 API Key System (IMPORTANT)
-- [ ] Store API keys in DB
-- [ ] Hash API keys
-- [ ] Associate API keys with services
-- [ ] Rotate/revoke API keys
+### 3. Status Page Backend
+- [ ] Public API to fetch current system status and active incidents
+- [ ] API to fetch historical uptime data
 
----
+### 4. AI Integration (Root Cause & Summaries)
+- [ ] Prompt engineering and LLM integration (OpenAI/Gemini/Anthropic)
+- [ ] Automated root cause analysis on incident creation/update
+- [ ] Postmortem report generation endpoint
 
-### 🔴 Incident Management
-- [ ] Get all incidents API
-- [ ] Get incident by ID
-- [ ] Update incident status (resolve)
-- [ ] Add pagination
-
----
-
-### 🔴 Webhook System
-- [ ] Accept external alerts (UptimeRobot, etc.)
-- [ ] Create incidents from webhook
-- [ ] Verify webhook signature
-
----
-
-### 🔴 Notification System
-- [ ] Send alerts to team
-- [ ] Email / Slack integration
-- [ ] War room creation (group system)
-
----
-
-### 🔴 Logging & Monitoring
-- [ ] Add request logging (Winston/Pino)
-- [ ] Error tracking
-- [ ] Performance monitoring
-
----
-
-### 🔴 Security Improvements
-- [ ] Rate limiting
-- [ ] Helmet middleware
-- [ ] Input sanitization
-
----
-
-### 🔴 Deployment
-- [ ] Environment config (appConfig)
-- [ ] Docker setup
-- [ ] CI/CD pipeline
-- [ ] Hosting (AWS / Render / Railway)
-
----
-
-## 🧠 Current Architecture
+### 5. Production Readiness & DevOps
+- [ ] Request logging (Morgan/Winston/Pino)
+- [ ] Rate limiting & Helmet middleware
+- [ ] Environment configuration management
+- [ ] Dockerization & CI/CD pipeline
