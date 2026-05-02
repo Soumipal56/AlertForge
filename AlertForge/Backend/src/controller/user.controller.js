@@ -1,14 +1,15 @@
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { HTTP_STATUS } from "../config/constants.js";
-import { findUserByIdDAO, updateUserByIdDAO } from "../dao/user.dao.js";
+import { findUserByClerkIdDAO, updateUserByClerkIdDAO } from "../dao/user.dao.js";
 
 /**
  * @description Get notification settings for the authenticated user
  */
 export const getUserSettings = async (req, res, next) => {
     try {
-        const settings = await findUserByIdDAO(req.user.userId);
+        const { clerkId } = req.params;
+        const settings = await findUserByClerkIdDAO(clerkId);
 
         if (!settings) {
             throw new ApiError(HTTP_STATUS.NOT_FOUND, "User not found");
@@ -25,9 +26,10 @@ export const getUserSettings = async (req, res, next) => {
  */
 export const updateUserSettings = async (req, res, next) => {
     try {
+        const { clerkId } = req.params;
         const updates = req.body;
 
-        const settings = await updateUserByIdDAO(req.user.userId, updates);
+        const settings = await updateUserByClerkIdDAO(clerkId, updates);
 
         if (!settings) {
             throw new ApiError(HTTP_STATUS.NOT_FOUND, "User not found");

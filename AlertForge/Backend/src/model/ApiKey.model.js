@@ -22,7 +22,10 @@ const apiKeySchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
-
+    clerkId: {
+        type: String,
+        index: true,
+    },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",

@@ -7,7 +7,7 @@ import { createApiKeyService } from "../services/apikey.service.js";
 
 export const createApiKey = async (req, res, next) => {
     try {
-        const { name } = req.body || {};
+        const { name, clerkId } = req.body || {};
         const userId = req.user?.userId;
         const rawKey = generateApiKey();
         const hashedKey = hashKey(rawKey);
@@ -23,6 +23,7 @@ export const createApiKey = async (req, res, next) => {
             serviceName: apiKeyName || undefined,
             isActive: true,
             user: userId,
+            clerkId: clerkId || undefined,
         });
 
         return res.status(HTTP_STATUS.CREATED).json(

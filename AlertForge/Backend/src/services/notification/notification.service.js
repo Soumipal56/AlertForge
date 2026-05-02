@@ -10,13 +10,16 @@ import User from "../../model/User.model.js";
  * @param {string} userId - The MongoDB user ID to notify.
  * @returns {Promise<void>}
  */
-export const sendIncidentNotification = async (data, userId) => {
+export const sendIncidentNotification = async (data, identifier) => {
     try {
-        // Fetch user notification settings
-        const settings = await User.findById(userId);
+        // Fetch user notification settings by either MongoDB _id or clerkId
+        const isMongoId = /^[0-9a-fA-F]{24}$/.test(identifier);
+        const settings = isMongoId
+            ? await User.findById(identifier)
+            : await User.findOne({ clerkId: identifier });
 
         if (!settings) {
-            console.warn(`No notification settings found for user: ${userId}`);
+            console.warn(`No notification settings found for identifier: ${identifier}`);
             // Fallback for demo or if data.to is provided
             if (data.to) {
                 await sendIncidentEmail({

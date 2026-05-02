@@ -23,3 +23,15 @@ export const updateUserByIdDAO = async (userId, updates) => {
         { new: true, runValidators: true }
     );
 };
+
+export const findUserByClerkIdDAO = async (clerkId) => {
+    return await User.findOne({ clerkId });
+};
+
+export const updateUserByClerkIdDAO = async (clerkId, updates) => {
+    return await User.findOneAndUpdate(
+        { clerkId },
+        { $set: updates },
+        { new: true, runValidators: true, upsert: true }
+    );
+};

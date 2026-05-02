@@ -1,13 +1,12 @@
 import { Router } from "express";
 import { getUserSettings, updateUserSettings } from "../controller/user.controller.js";
-import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
+import { dualAuthMiddleware } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.use(authMiddleware);
-router.use(attachApiKey);
+router.use(dualAuthMiddleware);
 
-router.get("/me/settings", getUserSettings);
-router.patch("/me/settings", updateUserSettings);
+router.get("/:clerkId/settings", getUserSettings);
+router.patch("/:clerkId/settings", updateUserSettings);
 
 export default router;
