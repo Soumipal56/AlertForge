@@ -10,18 +10,22 @@ export const createTimelineEventDAO = async (data) => {
 };
 
 /**
- * Fetches recent timeline entries for a given incident.
- * Ensures the incident belongs to the correct API Key scope.
+ * Fetches recent timeline entries for a given incident with pagination.
  * @param {string} incidentId
- * @param {string} apiKeyId
+ * @param {number} page
  * @param {number} limit
  * @returns {Promise<Array>}
  */
-export const getTimelineEventsByIncidentDAO = async (incidentId, apiKeyId, limit = 50) => {
+export const getTimelineEventsByIncidentDAO = async (incidentId, page = 1, limit = 20) => {
+    const safeLimit = Math.min(limit || 20, 50);
+    const skip = (page - 1) * safeLimit;
+
     return await timelineEventModel
         .find({ incidentId })
         .sort({ createdAt: -1 })
-        .limit(limit)
+        .skip(skip)
+        .limit(safeLimit)
         .lean();
 };
+
 

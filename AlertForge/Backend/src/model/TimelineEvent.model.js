@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import { TIMELINE_EVENTS } from "../utils/timeline.constants.js";
+
 
 /**
  * Stores a durable incident timeline entry so the activity feed can survive
