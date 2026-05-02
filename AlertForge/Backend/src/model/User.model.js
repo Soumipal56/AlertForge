@@ -28,10 +28,22 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
+    telegramChatIds: [
+        {
+            type: String,
+            trim: true,
+        }
+    ],
     discordWebhookUrl: {
         type: String,
         default: null,
     },
+    discordWebhookUrls: [
+        {
+            type: String,
+            trim: true,
+        }
+    ],
     whatsappNumber: {
         type: String,
         default: null,

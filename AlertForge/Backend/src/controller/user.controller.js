@@ -43,7 +43,7 @@ export const updateUserSettings = async (req, res, next) => {
  */
 export const updateProfile = async (req, res, next) => {
     try {
-        const { name, teamEmails, discordWebhookUrl, telegramChatId, notificationSettings } = req.body;
+        const { name, teamEmails, discordWebhookUrl, discordWebhookUrls, telegramChatId, telegramChatIds, notificationSettings } = req.body;
         const userId = req.user.userId;
 
         // Basic Validation
@@ -61,11 +61,20 @@ export const updateProfile = async (req, res, next) => {
             }
         }
 
+        if (discordWebhookUrls && Array.isArray(discordWebhookUrls)) {
+            const urlRegex = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//;
+            if (!discordWebhookUrls.every(url => urlRegex.test(url))) {
+                throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid Discord Webhook URL in discordWebhookUrls");
+            }
+        }
+
         const updates = {
             name,
             teamEmails,
             discordWebhookUrl,
+            discordWebhookUrls,
             telegramChatId: telegramChatId?.toString(),
+            telegramChatIds: telegramChatIds?.map(id => id.toString()),
             notificationSettings
         };
 
