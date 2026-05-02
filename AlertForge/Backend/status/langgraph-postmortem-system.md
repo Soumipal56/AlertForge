@@ -1,118 +1,99 @@
-# 🧠 AI Postmortem System (LangGraph)
+# AlertForge: LangGraph-Powered Incident Postmortem System
 
-## 1. System Overview
+## 🔍 Current System Overview
+AlertForge is a production-grade incident response platform designed to eliminate the "fog of war" during production outages. The system leverages a **LangGraph-based reasoning pipeline** to generate strictly grounded, evidence-based postmortems by analyzing three distinct data streams:
+1.  **Temporal Data**: System-generated timeline events (status changes, responder assignments).
+2.  **Conversational Data**: War room chat history (developer discussions, debugging commands).
+3.  **External Intelligence**: Real-world solutions fetched via the Tavily Search API and similar historical incidents retrieved from the Pinecone Vector Database.
 
-The AI Postmortem System is an automated, intelligence-driven diagnostic pipeline within **AlertForge**. By ingesting core incident data, event timelines, real-time war room chat logs, and historically similar incidents via Pinecone vector search, the system utilizes LangGraph to generate highly accurate, structured postmortem reports. 
+The backend is built on a distributed Node.js architecture using **ES Modules**, **Socket.IO** for real-time collaboration, and **Redis** for horizontal scaling and distributed rate limiting.
 
-LangGraph orchestrates the reasoning process by breaking down the analysis into discrete, specialized agent nodes. This prevents hallucinations and ensures the AI systematically identifies root causes, extracts actionable insights, and generates preventative tasks without manual effort.
+---
 
-## 2. Input → Output Flow
+## ⚙️ Architecture Flow
 
-The system processes data sequentially through specialized AI nodes, ensuring each phase of the postmortem is grounded in actual operational evidence.
+### 1. Incident Lifecycle & Ingestion
+*   **API Ingest**: Incidents are created via a secure REST API (API Key authenticated).
+*   **Intelligence Injection**: Upon creation, the `TavilyService` is triggered to find real-world solutions for the specific error message.
+*   **Vector Indexing**: The incident is immediately embedded using `text-embedding-3-small` and stored in **Pinecone** to enable semantic "similar incident" lookup.
 
-```mermaid
-flowchart TD
-    A[Incident Data & Chat] --> B[Fetch Similar Incidents Pinecone]
-    B --> C[LangGraph Execution]
-    
-    subgraph LangGraph Nodes
-    C --> D[Summary Node]
-    D --> E[Root Cause Node]
-    E --> F[Action Items Node]
-    F --> G[Learnings Node]
-    G --> H[Validator Node]
-    end
-    
-    H --> I[Final Postmortem Output]
+### 2. War Room Collaboration (Real-Time)
+*   **Socket.IO + Redis**: Sockets use a Redis adapter to ensure consistency across multiple server nodes.
+*   **Presence & Throttling**: A custom Redis-based middleware tracks responder presence and enforces distributed rate limits on chat messages and events.
+*   **Continuous Learning**: Every chat message is asynchronously indexed in Pinecone, providing the AI with a searchable "short-term memory" of the debugging process.
+
+### 3. Postmortem Generation (The LangGraph Pipeline)
+*   **Trigger**: Triggered once an incident is resolved.
+*   **Context Aggregation**: The `PostmortemService` pulls the incident details, the full timeline, the last 50 chat messages, similar incidents from Pinecone, and Tavily insights.
+*   **Reasoning**: The data is passed into a directed acyclic graph (DAG) where specialized nodes progressively build the report.
+
+---
+
+## 🧠 AI/Postmortem System Flow (LangGraph)
+
+The system uses a 5-step pipeline implemented via `StateGraph`:
+
+```text
+[START] --> [SummaryNode] --> [RootCauseNode] --> [ActionNode] --> [LearningNode] --> [ValidatorNode] --> [END]
 ```
 
-**Data Pipeline:**
-`Incident Data → LangGraph Nodes → Analysis → Root Cause → Action Items → Final Postmortem`
+| Node | Responsibility | Grounding Source |
+| :--- | :--- | :--- |
+| **Summary** | Executive review of what happened. | Timeline + Incident Status |
+| **Root Cause** | Identifying technical failure points. | War Room Chat + Tavily |
+| **Action Items** | Technical, grounded preventive tasks. | Chat + Similar Incidents |
+| **Learning** | Process and reliability improvements. | Full Context |
+| **Validator** | Enforces JSON schema, removes hallucinations. | Strict Zod Parsing |
 
-## 3. Output Schema
+### Anti-Hallucination Controls
+*   **Negative Constraints**: Prompts explicitly forbid "filler" items (e.g., "schedule a meeting").
+*   **Evidence Fallback**: If a section lacks data, the AI must return *"Not available in provided data"* instead of speculating.
+*   **Confidence Scoring**: The `ValidatorNode` assigns a score based on the density of evidence; reports < 0.75 are flagged for manual review.
 
-The system outputs a strictly validated JSON object enforcing the following schema:
+---
 
-* **`rootCause`** *(String)*: The fundamental technical or procedural failure that caused the incident.
-* **`summary`** *(String)*: A chronological overview of the impact, detection, and mitigation.
-* **`contributingFactors`** *(Array of Strings)*: Secondary issues that exacerbated the outage or delayed recovery.
-* **`learnings`** *(Array of Strings)*: High-level takeaways to improve system resilience.
-* **`actionItems`** *(Array of Objects)*: Specific preventative tasks.
-  * `description` *(String)*: What needs to be done.
-  * `owner` *(String)*: The role responsible (e.g., Backend, DevOps, QA, Manager).
-  * `deadline` *(String)*: Suggested timeframe (e.g., "1 week", "immediate").
-  * `status` *(String)*: Current state, typically defaults to "pending".
-* **`aiConfidence`** *(Number)*: A score (0-100) indicating the LLM's certainty based on evidence quality.
-* **`createdAt`** / **`updatedAt`** *(String)*: ISO timestamps.
-* **`incidentId`** *(String)*: Reference to the parent AlertForge incident.
+## 🚨 Issues / Gaps Found in Backend
 
-## 4. Action Items Intelligence
+1.  **Tavily Redundancy**: Insights are fetched during incident creation and again during postmortem generation. While this ensures fresh data, it increases latency and API costs.
+2.  **Date Representation**: MongoDB stores native Date objects, but LangGraph/Mistral requires ISO strings. While handled in `formatter.js`, it requires strict vigilance in schema updates.
+3.  **Similar Incident Heuristics**: The current token-based regex fallback for finding similar incidents is effective for exact matches but lacks the semantic nuance of the primary Pinecone search.
+4.  **Rate Limit Granularity**: Socket rate limits are currently uniform; they should be tiered based on user roles (e.g., Incident Commanders vs. Observers).
 
-The Action Items Node leverages role-based intelligence to automatically distribute recovery tasks across the engineering organization:
+---
 
-* **Multi-Role Assignment**: The AI parses the technical nature of the failure to assign tasks to specific operational roles (e.g., assigning database indexing to `Backend`, deployment pipeline fixes to `DevOps`, or test coverage to `QA`).
-* **Deadline Assignment Logic**: Criticality dictates deadlines. Security or data-loss vulnerabilities receive "immediate" or "24 hours" deadlines, while technical debt receives "1 week" or "next sprint" suggestions.
-* **Status Tracking**: All generated items initialize with a "pending" status, ready to be synced with Jira or internal issue trackers.
+## 🔌 Socket + Redis Architecture
 
-## 5. AI Reasoning Layer
+*   **Distributed State**: Presence counts and room memberships are synchronized via Redis, allowing the system to handle thousands of concurrent responders across a cluster.
+*   **Event Throttling**: 
+    - `chat:message`: Max 3/sec (Burst).
+    - `chat:typing`: Max 1/2sec.
+    - `join_room`: Max 5/min.
+*   **Read-Only Mode**: The socket server automatically enforces read-only state for "Resolved" incident rooms, preventing post-incident chat noise.
 
-The LangGraph architecture mimics human incident investigation:
+---
 
-* **Root Cause Determination**: The AI cross-references error logs in the timeline with commands run by engineers in the War Room chat. It looks for the *first* point of failure rather than the symptom.
-* **Extracting Contributing Factors**: The model specifically identifies delays in detection, missing alerts, or confusing runbooks that made the incident harder to resolve.
-* **Generating Learnings**: By comparing the current incident against Pinecone historical vectors, the AI extracts systemic themes (e.g., "We repeatedly fail to scale Redis during flash sales").
-* **Confidence Scoring**: If the chat logs are empty or the timeline is sparse, the Validator Node lowers the `aiConfidence` score, flagging the postmortem for human review.
+## 🧩 Missing Features or Improvements Needed
 
-## 6. Real Example Response
+*   **Semantic RAG for Past Postmortems**: Currently, Pinecone search focuses on *Incidents*. The system should also query previous *Postmortem results* to find how similar problems were definitively solved.
+*   **Manual Regeneration Flow**: A mechanism to "re-run" the LangGraph if new evidence (like late-arriving logs) is added after the initial resolution.
+*   **Incident Impact Graphing**: Integrating metrics from external monitoring (e.g., Prometheus) into the LangGraph context for more accurate impact assessment.
 
-Below is a real example of the final API JSON response generated by the LangGraph pipeline:
+---
 
-```json
-{
-  "incidentId": "incident:69f57b5f67e950cb4a046332",
-  "summary": "At 04:30 UTC, the primary payment gateway began timing out, resulting in a 15% drop in successful checkouts. The alert fired at 04:35 UTC. Responders joined the War Room, identified a database connection pool exhaustion issue, and manually scaled the max connections to resolve the incident at 04:50 UTC.",
-  "rootCause": "The payment microservice exhausted its database connection pool because a recent deployment introduced an unpaginated query that held connections open for too long under high load.",
-  "contributingFactors": [
-    "No active monitoring on the database connection pool utilization.",
-    "The unpaginated query bypassed QA performance testing.",
-    "Initial responders lacked access to scale the database immediately."
-  ],
-  "learnings": [
-    "All queries touching the transactions table must enforce strict pagination.",
-    "Connection pool metrics must be treated as critical telemetry."
-  ],
-  "actionItems": [
-    {
-      "description": "Refactor the transaction history query to use cursor-based pagination.",
-      "owner": "Backend",
-      "deadline": "Immediate",
-      "status": "pending"
-    },
-    {
-      "description": "Implement Datadog alerts for DB connection pool > 80% capacity.",
-      "owner": "DevOps",
-      "deadline": "24 hours",
-      "status": "pending"
-    },
-    {
-      "description": "Add load testing to the CI/CD pipeline for the payment service.",
-      "owner": "QA",
-      "deadline": "1 week",
-      "status": "pending"
-    }
-  ],
-  "aiConfidence": 92,
-  "createdAt": "2026-05-02T05:38:15.480Z",
-  "updatedAt": "2026-05-02T05:38:15.480Z"
-}
-```
+## 🚀 Recommended Fixes / Enhancements
 
-## 7. Improvements / Future Enhancements
+1.  **Context Caching**: Store the initial Tavily insights in the Incident document and pass it directly to the Postmortem graph to reduce API calls.
+2.  **Granular Confidence Scoring**: Weight the `aiConfidence` score more heavily toward the `RootCauseNode` findings, as that is where hallucinations are most risky.
+3.  **Asynchronous Indexing**: Move the Pinecone upsert logic to a dedicated worker queue (e.g., BullMQ) to ensure incident creation remains lightning-fast even under high vector DB latency.
 
-Based on the system's current analytical capabilities, the following enhancements are planned:
+---
 
-* **Severity Auto-Classification**: Use the AI to retroactively assess if the incident's assigned severity matched its actual impact.
-* **Timeline Reconstruction**: Automatically generate a millisecond-accurate timeline table from scattered chat logs and system alerts.
-* **Incident Recurrence Detection**: Hard-block pull requests or deployments if the AI detects the exact same root cause returning within 30 days.
-* **Prevention Suggestions**: Automatically generate Terraform or Pulumi snippets to patch infrastructure gaps identified in the postmortem.
-* **War Room Integration**: Feed the generated Action Items back into the live War Room chat so responders can instantly accept and track tasks before disconnecting.
+## 📌 Final Production Readiness Checklist
+
+- [x] **ES Module Compliance**: All imports use `.js` extensions.
+- [x] **Vector Consistency**: Pinecone upserts use the correct `records` array format (v2 SDK).
+- [x] **Authentication**: All API routes and Sockets require valid API Keys.
+- [x] **Rate Limiting**: Distributed Redis-based limits active.
+- [x] **Hallucination Prevention**: Mandatory grounding rules applied to all prompts.
+- [x] **Structured Output**: Final postmortem output validated via Zod.
+- [ ] **Worker Scaling**: (Pending) Transitioning Pinecone tasks to background workers.
