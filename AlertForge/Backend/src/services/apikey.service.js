@@ -5,15 +5,22 @@ import {
     createApiKeyDAO,
     findApiKeysByUserDAO,
     deactivateApiKeyByIdDAO,
+    deactivateActiveApiKeysByUserDAO,
 } from "../dao/apikey.dao.js";
 
 /**
  * Creates and persists a new API key record (hashed key stored, raw shown once).
+ * Automatically deactivates any existing active keys for the user.
  * Input: { key, name, serviceName, isActive, user }
  */
 export const createApiKeyService = async (data) => {
+    // FEATURE-7: Ensure only one active key exists by deactivating old ones first
+    if (data.isActive !== false) {
+        await deactivateActiveApiKeysByUserDAO(data.user);
+    }
     return await createApiKeyDAO(data);
 };
+
 
 /**
  * Returns all API keys for the authenticated user.

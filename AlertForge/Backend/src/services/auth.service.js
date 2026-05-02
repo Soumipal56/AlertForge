@@ -3,7 +3,7 @@ import ApiError from "../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/token.js";
 import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants.js";
 import { createUserDAO, findUserByEmailDAO, findUserByEmailWithPasswordDAO, findUserByIdDAO, updateUserByIdDAO } from "../dao/user.dao.js";
-import { createApiKeyDAO } from "../dao/apikey.dao.js";
+import { createApiKeyService } from "./apikey.service.js";
 import { generateApiKey } from "../utils/generateApiKey.js";
 import { hashKey } from "../utils/hashKey.js";
 
@@ -44,7 +44,7 @@ export const registerService = async ({ email, password }) => {
     }
 
     const rawApiKey = generateApiKey();
-    await createApiKeyDAO({
+    await createApiKeyService({
         key: hashKey(rawApiKey),
         user: user._id,
         isActive: true,
@@ -58,6 +58,7 @@ export const registerService = async ({ email, password }) => {
         refreshToken: generateRefreshToken(userId),
     };
 };
+
 
 export const loginService = async ({ email, password }) => {
     const normalizedEmail = normalizeEmail(email);
