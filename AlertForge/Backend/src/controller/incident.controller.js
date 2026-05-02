@@ -2,12 +2,11 @@ import { createIncidentService, getAllIncidentsService, getIncidentByIdService, 
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
-import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from "../config/constants.js";
+import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, INCIDENT_STATUS } from "../config/constants.js";
 import { sendIncidentNotification } from "../services/notification/notification.service.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
 import { createTimelineEventService } from "../services/timeline/timeline.service.js";
 import { generatePostmortem } from "../services/postmortem.service.js";
-import { INCIDENT_STATUS } from "../config/constants.js";
 
 const buildIncidentSocketPayload = (incident) => ({
     id: incident?._id?.toString?.() || incident?.id || null,
@@ -176,9 +175,13 @@ export const updateIncidentStatus = async (req, res, next) => {
                 incident: buildIncidentSocketPayload(updated),
             });
 
-            void generatePostmortem(updated?._id?.toString?.() || id).catch((error) => {
+            try {
+                // Generate the postmortem immediately so the database stays in sync with the resolved state.
+                await generatePostmortem(updated?._id?.toString?.() || id);
+            } catch (error) {
+                // The incident update must still succeed even if AI generation fails.
                 console.error("[Postmortem] Generation failed:", error.message);
-            });
+            }
         }
 
         return res.json(new ApiResponse(200, "Incident updated", updated));

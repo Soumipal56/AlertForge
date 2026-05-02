@@ -29,6 +29,7 @@ app.get(`/`, (req, res) => {
 app.use(`/api/apikeys`, apiKeyRouter)
 app.use(`/api/incidents`, incidentRouter)
 app.use(`/api/postmortem`, postmortemRouter)
+app.use(`/postmortem`, postmortemRouter)
 app.use(`/api`, uploadRouter)
 
 

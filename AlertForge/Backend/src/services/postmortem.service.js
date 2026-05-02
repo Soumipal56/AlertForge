@@ -68,7 +68,11 @@ export const generatePostmortem = async (incidentId) => {
     }
 
     const context = await loadPostmortemContext(incidentId);
-    const graphResult = await runPostmortemGraph(context);
+    const graphResult = await runPostmortemGraph({
+        incident: context.incident,
+        timeline: context.timeline,
+        similarIncidents: context.similarIncidents,
+    });
 
     const validatedOutput = PostmortemOutputSchema.safeParse(graphResult);
 
