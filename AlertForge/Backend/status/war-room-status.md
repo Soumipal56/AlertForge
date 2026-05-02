@@ -1,54 +1,41 @@
-# WAR ROOM — STATUS
+# 🛡️ WAR ROOM — STATUS
 
-_Last updated: 2026-05-01_
-
----
-
-## Done
-
-- Real-time incidents work through socket emits after DB writes
-- War room chat works through `join_warroom` and `chat:message`
-- Socket auth uses API keys only
-- Chat messages persist in MongoDB
-- Timeline events now persist in MongoDB
-- Presence updates are broadcast with `room:presence`
+_Updated: 2026-05-02_
 
 ---
 
-## Fixed
+## ✅ DONE
 
-- Timeline is no longer in-memory only
-- Chat persistence was moved into `services/chat/chat.service.js`
-- Presence tracking was moved into `services/socket/presence.service.js`
-- CORS now reads from `process.env.CLIENT_URL`
-- Socket errors now use the standard `error:event` payload for runtime validation issues
-
----
-
-## Partial / Future
-
-- Presence is still in-memory and will reset on server restart
-- Redis adapter is still not implemented
-- Incident filtering by room/service is still handled by the current incident query flow
+- **Incident-Specific Rooms**: Direct collaboration for specific incidents (`join_incident_room`).
+- **Multi-Media Chat**: Support for text, images, and PDFs via ImageKit integration.
+- **Persistence**: 100% of chat and timeline events are backed by MongoDB.
+- **Read-Only Mode**: Resolved incidents automatically transition to read-only state.
+- **Presence Tracking**: Real-time participant counts per room.
+- **Identity Fallback**: Anonymous users are automatically assigned `User-1`, `User-2` identities.
+- **Secure Auth**: Handshake-level API key verification.
 
 ---
 
-## Real Flow
+## 🛠️ TECHNICAL STACK
 
-```
-API key
-  → socket auth handshake
-  → join_warroom
-  → load room history
-  → chat:message
-  → validate
-  → save to MongoDB
-  → emit to room
+- **Real-time**: Socket.io 4.x
+- **Storage**: MongoDB (WarRoomMessages collection)
+- **Cloud Media**: ImageKit.io
+- **Middleware**: Multer (Memory Storage)
 
-Incident create/update
-  → controller
-  → DB write
-  → timeline save
-  → socket emit
-  → frontend updates from events
-```
+---
+
+## ⚠️ LIMITATIONS (PARTIAL)
+
+- **Presence Reset**: Participant counts live in memory and reset on server restart.
+- **History Limits**: Current room join loads a fixed number of recent messages (no pagination).
+- **File Expiry**: ImageKit files currently persist indefinitely; no auto-cleanup for old attachments.
+
+---
+
+## 🚀 CURRENT WORKFLOW
+
+1. **Join**: User provides API key -> Handshake -> Join Room.
+2. **Collaborate**: Post text/files. Files are uploaded via API then shared via Socket.
+3. **Resolve**: Incident status updated -> Broadcast `incident:resolved` -> Chat locked.
+4. **Audit**: History persists for post-mortem analysis.

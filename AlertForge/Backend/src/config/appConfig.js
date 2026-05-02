@@ -19,6 +19,23 @@ const appConfig = {
     TWILIO_PHONE_NUMBER: process.env.TWILIO_WHATSAPP_NUMBER,
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
+    upstashRedisRestUrl: process.env.UPSTASH_REDIS_REST_URL,
+    upstashRedisRestToken: process.env.UPSTASH_REDIS_REST_TOKEN,
+    redisUrl: process.env.REDIS_URL || null,
+    MistralApiKey: process.env.MISTRAL_API_KEY,
+    MistralModel: process.env.MISTRAL_MODEL,
+    MistralTemperature: process.env.MISTRAL_TEMPERATURE,
+    pinecone: {
+        apiKey: process.env.PINECONE_API_KEY,
+        host: process.env.PINECONE_HOST,
+        index: process.env.PINECONE_INDEX
+    },
+    jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
+    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
+    tavilyApiKey: process.env.TAVILY_API_KEY,
 };
 
 export default appConfig;

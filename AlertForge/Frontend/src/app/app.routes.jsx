@@ -15,8 +15,24 @@ import Team from "@/features/pages/dashboard/Team";
 import Integrations from "@/features/pages/dashboard/Integrations";
 import Services from "@/features/pages/dashboard/Services";
 import { Overview } from "@/features/pages/dashboard/Overview";
+import DashboardLayout from "@/features/pages/dashboard/Dashboard";
+import RegisterTest from "@/pages/RegisterTest";
+import LoginTest from "@/pages/LoginTest";
+import DashboardTest from "@/pages/DashboardTest";
 
 export const routes = createBrowserRouter([
+  {
+    path: "/test-register",
+    element: <RegisterTest />,
+  },
+  {
+    path: "/test-login",
+    element: <LoginTest />,
+  },
+  {
+    path: "/test-dashboard",
+    element: <DashboardTest />,
+  },
   {
     path: "/sso-callback",
     element: <AuthenticateWithRedirectCallback />,
@@ -27,6 +43,10 @@ export const routes = createBrowserRouter([
   // },
   {
     path: "/war-room-chat",
+    element: <WarRoomChat />,
+  },
+  {
+    path: "/warroom/:incidentId",
     element: <WarRoomChat />,
   },
   {
