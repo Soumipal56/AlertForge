@@ -74,14 +74,14 @@ export const googleCallback = async (req, res, next) => {
     try {
         // req.user is populated by Passport after successful Google authentication
         const googleProfile = req.user;
-
+        console.log(googleProfile)
         if (!googleProfile) {
             return res.redirect(`${appConfig.frontendUrl}/login?error=google_auth_failed`);
         }
 
         // Login or create user with Google profile data
         const user = await loginWithGoogle(googleProfile);
-
+        
         const userId = user._id.toString();
         const accessToken = generateAccessToken(userId);
         const refreshToken = generateRefreshToken(userId);

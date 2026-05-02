@@ -95,18 +95,27 @@ export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
         throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email is required from Google");
     }
 
-    // Find user by email
+    // 1. Find user by email (don't search by googleId yet to avoid duplicates)
     let user = await findUserByEmailDAO(normalizedEmail);
 
     if (user) {
-        // User exists - update googleId if missing
-        if (!user.googleId) {
-            user = await updateUserByIdDAO(user._id, { googleId });
+        // 2. If user exists, check if googleId is already linked
+        if (user.googleId) {
+            // Security Check: Ensure the same Google account is being used
+            if (user.googleId !== googleId) {
+                throw new ApiError(
+                    HTTP_STATUS.CONFLICT,
+                    "This email is already linked to a different Google account."
+                );
+            }
+        } else {
+            // 3. If user exists but has no googleId, link it
+            user = await updateUserByIdDAO(user._id, { googleId, avatar });
         }
         return user;
     }
 
-    // User doesn't exist - create new user
+    // 4. If user doesn't exist, create a new one
     try {
         user = await createUserDAO({
             email: normalizedEmail,
@@ -115,17 +124,16 @@ export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
             googleId,
             avatar,
             isVerified: true, // Google emails are verified
-            role: "buyer", // default role
+            role: "buyer",    // Default role
         });
     } catch (error) {
         if (error?.code === 11000) {
-            // Handle duplicate key error (email or googleId)
             const duplicateField = Object.keys(error.keyPattern || {})[0];
             const message = duplicateField === "email"
                 ? "User already exists with this email"
                 : duplicateField === "googleId"
-                    ? "Google account already linked to another user"
-                    : `Duplicate user index conflict: ${duplicateField || "unknown"}`;
+                    ? "This Google account is already linked to another user"
+                    : `Duplicate user conflict: ${duplicateField}`;
 
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, message);
         }
@@ -134,6 +142,7 @@ export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
 
     return user;
 };
+
 
 export const refreshAccessTokenService = async (refreshToken) => {
     if (!refreshToken) {
