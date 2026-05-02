@@ -3,11 +3,12 @@ import appConfig from "../../config/appConfig.js";
 /**
  * Sends an incident notification to Telegram.
  * @param {Object} data - The incident data.
+ * @param {string} [dynamicChatId] - Optional dynamic chat ID for the recipient.
  * @returns {Promise<void>}
  */
-export const sendTelegramNotification = async (data) => {
+export const sendTelegramNotification = async (data, dynamicChatId = null) => {
     const botToken = appConfig.TELEGRAM_BOT_TOKEN;
-    const chatId = appConfig.TELEGRAM_CHAT_ID;
+    const chatId = dynamicChatId || appConfig.TELEGRAM_CHAT_ID;
 
     if (!botToken || !chatId || botToken === "your_telegram_bot_token_here") {
         return;
