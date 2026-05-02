@@ -83,28 +83,35 @@ export const createIncident = async (req, res, next) => {
     }
 };
 /**  
- * @description Controller function to retrieve all incidents
- * - Calls the service function to get all incidents from the database
- * - Returns a standardized API response with the list of incidents
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object used to send the API response
- * @param {Function} next - Express next function for error handling
- * @returns {Object} API response with status code, message, and list of incidents
+ * @description Controller function to retrieve all incidents for the dashboard
+ * - Extracts 'status' filter from query params
+ * - Validates status (all, investigating, identified, monitoring, resolved)
+ * - Returns filtered incidents + status-wise counts
+ * @returns {Object} API response with status code, message, and structured data
  */
 export const getAllIncidents = async (req, res, next) => {
     try {
-        const incidents = await getAllIncidentsService(req.apiKey._id);
+        const { status } = req.query;
+        const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "all";
+
+        const validStatuses = ["all", "open", "investigating", "identified", "monitoring", "resolved"];
+        if (!validStatuses.includes(normalizedStatus)) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid status filter");
+        }
+
+        const { incidents, counts } = await getAllIncidentsService(req.apiKey._id, normalizedStatus);
 
         return res.json(new ApiResponse(
             HTTP_STATUS.OK,
             SUCCESS_MESSAGES.INCIDENT.FETCHED,
-            incidents
+            { incidents, counts }
         ));
 
     } catch (error) {
         next(error);
     }
 };
+
 
 /**  
  * @description Controller function to retrieve a single incident by its ID

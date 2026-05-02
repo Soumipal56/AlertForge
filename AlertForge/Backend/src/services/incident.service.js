@@ -1,7 +1,7 @@
-import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO, updateIncidentStatusDAO } from "../dao/incident.dao.js";
+import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO, updateIncidentStatusDAO, getIncidentCountsDAO } from "../dao/incident.dao.js";
 import { fetchTavilyInsights } from "./ai/tavily.service.js";
 import ApiError from "../utils/ApiError.js";
-import { HTTP_STATUS } from "../config/constants.js";
+import { HTTP_STATUS, INCIDENT_STATUS } from "../config/constants.js";
 
 /**  
  * @description Service function to create a new incident by calling the corresponding DAO function
@@ -19,16 +19,42 @@ export const createIncidentService = async (data) => {
     return await createIncidentDAO(data);
 };
 /**  
- * @description Service function to retrieve all incidents from the database
- * @returns {Array} List of incident documents from the database
+ * @description Service function to retrieve all incidents from the database with status filtering and counts
+ * @returns {Object} { incidents: Array, counts: Object }
  */
-export const getAllIncidentsService = async (apiKeyId) => {
+export const getAllIncidentsService = async (apiKeyId, status = "all") => {
     if (!apiKeyId) {
         throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
     }
 
-    return await getAllIncidentsDAO(apiKeyId);
+    // 1. Fetch filtered incidents
+    const incidents = await getAllIncidentsDAO(apiKeyId, status);
+
+    // 2. Fetch aggregation counts
+    const aggregation = await getIncidentCountsDAO(apiKeyId);
+
+    // 3. Transform aggregation into a clean counts object with defaults
+    const counts = {
+        all: 0,
+        investigating: 0,
+        identified: 0,
+        monitoring: 0,
+        resolved: 0,
+        open: 0, // Inclusion for system consistency
+    };
+
+    let total = 0;
+    aggregation.forEach(item => {
+        if (counts.hasOwnProperty(item._id)) {
+            counts[item._id] = item.count;
+        }
+        total += item.count;
+    });
+    counts.all = total;
+
+    return { incidents, counts };
 };
+
 
 /**  
  * @description Service function to retrieve a single incident by its ID from the database

@@ -11,11 +11,28 @@ export const createIncidentDAO = async (data) => {
 
 /**  
  * @description DAO function to retrieve all incidents from the database, sorted by creation date
+ * Supports optional status-based filtering.
  * @returns {Array} List of incident documents from the database
  */
-export const getAllIncidentsDAO = async (apiKeyId) => {
-    return await incidentModel.find({ apiKeyId }).sort({ createdAt: -1 });
+export const getAllIncidentsDAO = async (apiKeyId, status = null) => {
+    const query = { apiKeyId };
+    if (status && status !== "all") {
+        query.status = status;
+    }
+    return await incidentModel.find(query).sort({ createdAt: -1 });
 };
+
+/**
+ * @description DAO function to aggregate incident counts grouped by status.
+ * @returns {Array} List of counts per status.
+ */
+export const getIncidentCountsDAO = async (apiKeyId) => {
+    return await incidentModel.aggregate([
+        { $match: { apiKeyId } },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+};
+
 /**  
  * @description DAO function to retrieve a single incident by its ID from the database
  * @param {string} id - The ID of the incident to retrieve
