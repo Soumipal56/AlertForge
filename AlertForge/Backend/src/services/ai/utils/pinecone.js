@@ -40,10 +40,15 @@ export const storeIncidentInPinecone = async (incident) => {
         const severity = incident.severity || "unknown";
 
         const text = `Service: ${service}, Issue: ${message}, Severity: ${severity}`;
+        if (!text || text.trim().length === 0) {
+            console.warn(`[Pinecone] skipped (empty text) for incident ${incident._id}`);
+            return;
+        }
+
         const embedding = await embedText(text);
 
         if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
-            console.warn(`[Pinecone] Skipping incident ${incident._id}: Embedding failed or returned empty`);
+            console.warn(`[Pinecone] skipped (empty embedding) for incident ${incident._id}`);
             return;
         }
 
@@ -64,16 +69,17 @@ export const storeIncidentInPinecone = async (incident) => {
         console.log("[DEBUG] Incident Input:", incident._id);
         console.log("[DEBUG] Generated Text:", text);
         console.log("[DEBUG] Embedding Length:", embedding?.length);
-        console.log("[DEBUG] Records:", records.length);
-
         if (!records || records.length === 0) {
             console.warn("[Pinecone] No valid records → skipping upsert");
             return;
         }
 
-        console.log("[Pinecone] Final Payload:", { records: records });
+        console.log("[Pinecone FINAL VECTOR]:", {
+            id: record.id,
+            vectorLength: embedding.length
+        });
 
-        await pineconeIndex.upsert({ records: records });
+        await pineconeIndex.upsert(records);
         console.log(`[Pinecone] Successfully stored incident ${incident._id}`);
     } catch (error) {
         console.error("[Pinecone] Failed to store incident:", error);
@@ -113,8 +119,8 @@ export const storeChatInPinecone = async (messages, roomId) => {
             
             // If content is empty (but it has fileUrl) -> skip or use fileUrl?
             // "If content is empty -> SKIP"
-            if (!content) {
-                console.warn("[Pinecone] Skipped chat message: Empty text");
+            if (!content || content.trim().length === 0) {
+                console.warn("[Pinecone] skipped (empty text) for chat message");
                 continue;
             }
 
@@ -150,9 +156,9 @@ export const storeChatInPinecone = async (messages, roomId) => {
             return;
         }
 
-        console.log("[Pinecone] Final Payload:", { records: records });
+        console.log(`[Pinecone] Upserting ${records.length} chat records for room ${roomId}`);
 
-        await pineconeIndex.upsert({ records: records });
+        await pineconeIndex.upsert(records);
         console.log(`[Pinecone] Stored ${records.length} records successfully for room ${roomId}`);
     } catch (error) {
         console.error("[Pinecone] Failed to store chat:", error);
@@ -230,10 +236,14 @@ export const storePostmortemInPinecone = async (postmortem, incident) => {
         // We include rootCause and learnings as they are the most valuable for future AI context
         const text = `Service: ${service}\nSummary: ${postmortem.summary}\nRoot Cause: ${postmortem.rootCause}\nLearnings: ${postmortem.learnings}`;
         
+        if (!text || text.trim().length === 0) {
+            console.warn(`[Pinecone] skipped (empty text) for postmortem ${postmortem._id || postmortem.incidentId}`);
+            return;
+        }
         const embedding = await embedText(text);
 
         if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
-            console.warn(`[Pinecone] Skipping postmortem ${postmortem._id || postmortem.incidentId}: Embedding failed`);
+            console.warn(`[Pinecone] skipped (empty embedding) for postmortem ${postmortem._id || postmortem.incidentId}`);
             return;
         }
 
@@ -255,19 +265,95 @@ export const storePostmortemInPinecone = async (postmortem, incident) => {
         console.log("[DEBUG] Postmortem Input incidentId:", incidentIdStr);
         console.log("[DEBUG] Generated Text length:", text.length);
         console.log("[DEBUG] Embedding Length:", embedding?.length);
-        console.log("[DEBUG] Records:", records.length);
-
         if (!records || records.length === 0) {
             console.warn("[Pinecone] No valid records → skipping upsert");
             return;
         }
 
-        console.log("[Pinecone] Final Payload:", { records: records });
+        console.log("[Pinecone FINAL VECTOR]:", {
+            id: record.id,
+            vectorLength: embedding.length
+        });
 
-        await pineconeIndex.upsert({ records: records });
+        await pineconeIndex.upsert(records);
         console.log(`[Pinecone] Stored 1 records successfully for postmortem ${incidentIdStr}`);
     } catch (error) {
         console.error("[Pinecone] Failed to store postmortem:", error);
+    }
+};
+
+export const storeExternalKnowledgeInPinecone = async (query, summary) => {
+    if (!pineconeIndex) return;
+    
+    if (!summary || summary.trim() === "") return;
+
+    try {
+        const text = `Query: ${query}\nSolution: ${summary}`;
+        if (!text || text.trim().length === 0) {
+            console.warn("[Pinecone] skipped (empty text) for external knowledge");
+            return;
+        }
+        
+        const embedding = await embedText(text);
+
+        if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+            console.warn("[Pinecone] skipped (empty embedding) for external knowledge");
+            return;
+        }
+
+        const record = {
+            id: `knowledge_${Date.now().toString()}_${Math.random().toString(36).substring(2, 7)}`,
+            values: embedding,
+            metadata: {
+                type: "external_knowledge",
+                query: query,
+                createdAt: new Date().toISOString()
+            }
+        };
+
+        const records = [record];
+        console.log("[Pinecone FINAL VECTOR]:", {
+            id: record.id,
+            vectorLength: embedding.length
+        });
+        await pineconeIndex.upsert(records);
+        console.log("[Pinecone] Stored external knowledge successfully");
+    } catch (error) {
+        console.error("[Pinecone] Failed to store external knowledge:", error.message);
+    }
+};
+
+/**
+ * Generic function to search Pinecone vectors
+ */
+export const searchPinecone = async ({ query, filter, topK = 3 }) => {
+    if (!pineconeIndex || !query || query.trim().length === 0) return "";
+    
+    try {
+        const embedding = await embedText(query);
+        if (!embedding || !Array.isArray(embedding) || embedding.length === 0) return "";
+        
+        const response = await pineconeIndex.query({
+            vector: embedding,
+            topK,
+            filter,
+            includeMetadata: true
+        });
+
+        if (!response.matches || response.matches.length === 0) return "";
+
+        return response.matches.map(match => {
+            const meta = match.metadata || {};
+            // If it's external knowledge, return the solution
+            if (meta.type === "external_knowledge") return meta.solution || meta.query || match.id;
+            // If it's chat
+            if (meta.type === "chat") return `${meta.sender || "Unknown"}: ${meta.content || ""}`;
+            // Incident or default
+            return `[${meta.type}] Service: ${meta.service || "unknown"} | ${meta.message || meta.content || ""}`;
+        }).join("\n");
+    } catch (error) {
+        console.error("[Pinecone] searchPinecone failed:", error.message);
+        return "";
     }
 };
 

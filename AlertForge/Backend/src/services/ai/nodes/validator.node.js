@@ -38,6 +38,12 @@ export const validatorNode = async (state) => {
             "",
             "Draft learnings:",
             state.learnings || "",
+            "",
+            "Draft debugging timeline:",
+            state.debuggingTimeline || "",
+            "",
+            "Draft external knowledge:",
+            JSON.stringify(state.externalKnowledge || {}, null, 2),
         ].join("\n");
 
         const result = await structuredModel.invoke([
@@ -56,6 +62,8 @@ export const validatorNode = async (state) => {
             contributingFactors: Array.isArray(result.contributingFactors) ? result.contributingFactors : [],
             actionItems: Array.isArray(result.actionItems) ? result.actionItems : [],
             learnings: result.learnings.trim(),
+            debuggingTimeline: result.debuggingTimeline.trim(),
+            externalKnowledge: result.externalKnowledge,
             confidence: result.confidence,
             validation,
             needsReview: result.confidence < 0.75,

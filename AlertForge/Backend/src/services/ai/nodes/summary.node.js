@@ -19,6 +19,8 @@ export const summaryNode = async (state) => {
 
         return {
             summary: result.summary.trim(),
+            debuggingTimeline: result.debuggingTimeline.trim(),
+            externalKnowledge: result.externalKnowledge,
         };
     } catch (error) {
         console.error("[LangGraph][summary] Failed to generate summary:", error.message);

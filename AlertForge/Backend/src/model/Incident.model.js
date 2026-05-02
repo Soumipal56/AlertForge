@@ -43,6 +43,10 @@ const incidentSchema = new mongoose.Schema({
     metadata: {
         type: Object, // webhook payload / logs
     },
+    realWorldInsights: {
+        type: String,
+        default: "",
+    },
     /**
      * Ownership ID (API Key reference).
      * This is the primary field for authorization. 

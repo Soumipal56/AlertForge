@@ -46,11 +46,20 @@ export const PostmortemActionItemSchema = z.object({
 
 export const SummaryNodeSchema = z.object({
     summary: z.string().min(1, "Summary is required"),
+    debuggingTimeline: z.string().default(""),
+    externalKnowledge: z.object({
+        summary: z.string().default(""),
+        sources: z.array(z.object({
+            title: z.string(),
+            url: z.string()
+        })).default([])
+    }).default({ summary: "", sources: [] }),
 }).strict();
 
 export const RootCauseNodeSchema = z.object({
     rootCause: z.string().min(1, "Root cause is required"),
     contributingFactors: z.array(z.string().min(1)).default([]),
+    confidence: z.number().min(0).max(1),
 }).strict();
 
 export const ActionNodeSchema = z.object({
@@ -67,6 +76,14 @@ export const PostmortemOutputSchema = z.object({
     contributingFactors: z.array(z.string().min(1)).default([]),
     actionItems: z.array(PostmortemActionItemSchema).min(1, "At least one action item is required"),
     learnings: z.string().min(1, "Learnings are required"),
+    debuggingTimeline: z.string().default(""),
+    externalKnowledge: z.object({
+        summary: z.string().default(""),
+        sources: z.array(z.object({
+            title: z.string(),
+            url: z.string()
+        })).default([])
+    }).default({ summary: "", sources: [] }),
     confidence: z.number().min(0).max(1),
 }).strict();
 
@@ -80,4 +97,11 @@ export const PostmortemGraphInputSchema = z.object({
     timeline: z.array(TimelineEventContextSchema).default([]),
     chat: z.string().default(""),
     similarIncidents: z.string().default(""),
+    externalKnowledge: z.object({
+        summary: z.string().default(""),
+        sources: z.array(z.object({
+            title: z.string(),
+            url: z.string()
+        })).default([])
+    }).default({ summary: "", sources: [] }),
 }).strict();
