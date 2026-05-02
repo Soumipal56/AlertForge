@@ -13,7 +13,7 @@ import { createApiKeyService, listApiKeysService, revokeApiKeyService } from "..
 export const createApiKey = async (req, res, next) => {
     try {
         const { name } = req.body || {};
-        const userId = req.user?.userId;
+        const userId = req.user.id;
         const rawKey = generateApiKey();
         const hashedKey = hashKey(rawKey);
         const apiKeyName = typeof name === "string" ? name.trim() : "";
@@ -48,7 +48,7 @@ export const createApiKey = async (req, res, next) => {
  */
 export const listApiKeys = async (req, res, next) => {
     try {
-        const userId = req.user?.userId;
+        const userId = req.user.id;
         const keys = await listApiKeysService(userId);
         return res.json(new ApiResponse(HTTP_STATUS.OK, "API keys fetched", keys));
     } catch (error) {
@@ -63,7 +63,7 @@ export const listApiKeys = async (req, res, next) => {
  */
 export const revokeApiKey = async (req, res, next) => {
     try {
-        const userId = req.user?.userId;
+        const userId = req.user.id;
         await revokeApiKeyService(req.params.id, userId);
         return res.json(new ApiResponse(HTTP_STATUS.OK, "API key revoked"));
     } catch (error) {

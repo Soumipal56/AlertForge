@@ -16,11 +16,8 @@ import { findUserByIdDAO } from "../dao/user.dao.js";
 export const requireRole = (...allowedRoles) => {
     return async (req, res, next) => {
         try {
-            const userId = req.user?.userId;
-
-            if (!userId) {
-                throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
-            }
+            const userId = req.user.id;
+            if (!userId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
 
             // Fetch fresh user to get current role (avoids stale JWT role claims)
             const user = await findUserByIdDAO(userId);

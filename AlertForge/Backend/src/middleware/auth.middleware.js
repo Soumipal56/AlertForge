@@ -30,7 +30,7 @@ export const authMiddleware = async (req, res, next) => {
 
 export const attachApiKey = async (req, res, next) => {
     try {
-        const userId = req.user?.userId;
+        const userId = req.user.id;
 
         if (!userId) {
             throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.UNAUTHORIZED);

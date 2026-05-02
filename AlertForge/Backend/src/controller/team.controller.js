@@ -19,7 +19,7 @@ import { sendInviteEmail } from "../services/notification/email.service.js";
  */
 export const getTeamMembers = async (req, res, next) => {
     try {
-        const organizationId = req.user?.userId;
+        const organizationId = req.user.organizationId;
         const members = await getTeamMembersDAO(organizationId);
         return res.json(new ApiResponse(HTTP_STATUS.OK, "Team members fetched", members));
     } catch (error) {
@@ -34,7 +34,7 @@ export const getTeamMembers = async (req, res, next) => {
  */
 export const inviteTeamMember = async (req, res, next) => {
     try {
-        const organizationId = req.user?.userId;
+        const organizationId = req.user.organizationId;
         const { name, email, password, role } = req.body;
 
         if (!email) {
@@ -98,7 +98,7 @@ export const inviteTeamMember = async (req, res, next) => {
  */
 export const updateTeamMemberRole = async (req, res, next) => {
     try {
-        const organizationId = req.user?.userId;
+        const organizationId = req.user.organizationId;
         const { userId, memberId, role } = req.body;
         const targetId = userId || memberId;
 
@@ -135,7 +135,7 @@ export const updateTeamMemberRole = async (req, res, next) => {
  */
 export const removeTeamMember = async (req, res, next) => {
     try {
-        const organizationId = req.user?.userId;
+        const organizationId = req.user.organizationId;
         const result = await removeTeamMemberDAO(req.params.id, organizationId);
         if (!result) {
             throw new ApiError(HTTP_STATUS.NOT_FOUND, "Team member not found");

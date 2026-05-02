@@ -37,7 +37,7 @@ export const authApiLimiter = rateLimit({
     ...rateLimitConfig.api.auth,
     store,
     keyGenerator: (req) => {
-        return req.apiKey?.id || req.user?.userId || req.ip;
+        return req.apiKey?.id || req.user.id || req.ip;
     },
     standardHeaders: true,
     legacyHeaders: false,
