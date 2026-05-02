@@ -57,6 +57,22 @@ const postmortemSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        debuggingTimeline: {
+            type: String,
+            default: "",
+        },
+        externalKnowledge: {
+            summary: {
+                type: String,
+                default: "",
+            },
+            sources: [
+                {
+                    title: String,
+                    url: String,
+                },
+            ],
+        },
         aiConfidence: {
             type: Number,
             min: 0,

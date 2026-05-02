@@ -22,6 +22,7 @@ export const rootCauseNode = async (state) => {
             contributingFactors: Array.isArray(result.contributingFactors)
                 ? result.contributingFactors.map((factor) => factor.trim()).filter(Boolean)
                 : [],
+            confidence: result.confidence || 0.5,
         };
     } catch (error) {
         console.error("[LangGraph][rootCause] Failed to generate root cause:", error.message);

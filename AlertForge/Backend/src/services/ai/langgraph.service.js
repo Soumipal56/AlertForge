@@ -25,7 +25,15 @@ const PostmortemGraphState = new StateSchema({
     timeline: z.array(TimelineEventContextSchema).default([]),
     chat: z.string().default(""),
     similarIncidents: z.string().default(""),
+    externalKnowledge: z.object({
+        summary: z.string().default(""),
+        sources: z.array(z.object({
+            title: z.string(),
+            url: z.string()
+        })).default([])
+    }).default({ summary: "", sources: [] }),
     summary: z.string().default(""),
+    debuggingTimeline: z.string().default(""),
     rootCause: z.string().default(""),
     contributingFactors: z.array(z.string()).default([]),
     actionItems: z.array(PostmortemActionItemSchema).default([]),
@@ -69,6 +77,8 @@ export const runPostmortemGraph = async (data) => {
             contributingFactors: Array.isArray(graphResult.contributingFactors) ? graphResult.contributingFactors : [],
             actionItems: Array.isArray(graphResult.actionItems) ? graphResult.actionItems : [],
             learnings: graphResult.learnings,
+            debuggingTimeline: graphResult.debuggingTimeline || "",
+            externalKnowledge: graphResult.externalKnowledge || { summary: "", sources: [] },
             confidence: typeof graphResult.confidence === "number" ? graphResult.confidence : 0,
         };
 

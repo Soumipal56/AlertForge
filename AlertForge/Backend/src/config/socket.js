@@ -12,6 +12,7 @@ import { addUser, getCount, removeUser, getRoomsForSocket } from "../services/so
 import { getIncidentByIdService } from "../services/incident.service.js";
 import { setupRedisAdapter } from "./redis.adapter.js";
 import { socketConnectionLimiter, throttleSocketEvent, rateLimitConfig } from "../middleware/rateLimiter/index.js";
+import { storeChatInPinecone } from "../services/ai/utils/pinecone.js";
 
 let ioInstance = null;
 
@@ -302,6 +303,15 @@ export const initSocket = async (httpServer) => {
                 const messagePayload = toMessagePayload(savedMessage);
                 ioInstance.to(room).emit("chat:message", messagePayload);
                 console.log(`[Socket] chat:message room=${room} socket=${socket.id}`);
+                console.log(`[DEBUG] Chat content length:`, payload?.content?.length || 0);
+
+                // Store in vector DB for future context
+                if (room.startsWith("incident:")) {
+                    const incidentId = room.split(":")[1];
+                    storeChatInPinecone([savedMessage], incidentId).catch(err => {
+                        console.error("[Socket] Failed to store chat message in Pinecone:", err.message);
+                    });
+                }
 
                 if (typeof ack === "function") {
                     ack({ success: true, message: messagePayload });

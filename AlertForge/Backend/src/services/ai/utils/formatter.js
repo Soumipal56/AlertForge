@@ -112,6 +112,7 @@ export const normalizeGraphInput = (input = {}) => {
         })),
         chat: typeof input?.chat === "string" ? input.chat : "",
         similarIncidents: typeof input?.similarIncidents === "string" ? input.similarIncidents : "",
+        externalKnowledge: input?.externalKnowledge || { summary: "", sources: [] },
     });
 
     return {
@@ -132,6 +133,7 @@ export const normalizeGraphInput = (input = {}) => {
         })),
         chat: parsed.chat,
         similarIncidents: parsed.similarIncidents,
+        externalKnowledge: parsed.externalKnowledge,
     };
 };
 
@@ -146,7 +148,14 @@ export const formatIncidentContext = (incident = {}) => [
     `Impact: ${normalizeText(incident.impact, "not recorded")}`,
     `Message: ${normalizeText(incident.message, "not recorded")}`,
     `Resolved At: ${formatDate(incident.resolvedAt)}`,
-].join("\n");
+    incident.externalKnowledge?.summary ? `
+External Knowledge Summary:
+${incident.externalKnowledge.summary}
+
+Sources:
+${(incident.externalKnowledge.sources || []).map(s => `${s.title}: ${s.url}`).join("\n")}
+` : null,
+].filter(Boolean).join("\n");
 
 /**
  * Formats the timeline as chronological evidence for the model.
@@ -171,6 +180,46 @@ export const formatTimelineContext = (timeline = []) => {
 };
 
 /**
+ * Formats chat messages for the AI reasoning context.
+ * Sorted ASC, formatted as "[Time] User: Message".
+ */
+export const formatChatContext = (chatMessages = []) => {
+    if (chatMessages.length === 0) {
+        return "No chat history recorded for this incident.";
+    }
+
+    return chatMessages
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .map(msg => {
+            const time = toDate(msg.createdAt);
+            const timeStr = time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "??:??";
+            return `[${timeStr}] ${msg.sender?.name || "System"}: ${msg.content}`;
+        })
+        .join("\n");
+};
+
+/**
+ * Combines timeline events and chat messages into a single chronological reconstruction.
+ */
+export const buildDebuggingTimeline = (timeline = [], chatMessages = []) => {
+    const combined = [
+        ...timeline.map(t => ({ ...t, sortDate: toDate(t.createdAt), entryType: 'timeline' })),
+        ...chatMessages.map(c => ({ ...c, sortDate: toDate(c.createdAt), entryType: 'chat' }))
+    ].sort((a, b) => (a.sortDate || 0) - (b.sortDate || 0));
+
+    if (combined.length === 0) return "Not available in provided data";
+
+    return combined.map(entry => {
+        const timeStr = entry.sortDate ? entry.sortDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "??:??";
+        if (entry.entryType === 'timeline') {
+            return `[${timeStr}] EVENT: ${entry.label} - ${entry.message}`;
+        } else {
+            return `[${timeStr}] CHAT: ${entry.sender?.name || "User"}: ${entry.content}`;
+        }
+    }).join("\n");
+};
+
+/**
  * Summarizes similar incidents so the model can detect recurring patterns.
  */
 export const formatSimilarIncidentContext = (similarIncidents = []) => {
@@ -185,6 +234,24 @@ export const formatSimilarIncidentContext = (similarIncidents = []) => {
         `   Status: ${normalizeText(incident.status, "unknown")}`,
         `   Created At: ${formatDate(incident.createdAt)}`,
     ].join("\n")).join("\n");
+};
+
+/**
+ * Formats structured external knowledge for prompt inclusion.
+ */
+export const formatExternalKnowledge = (knowledge = {}) => {
+    if (!knowledge?.summary) {
+        return "Not available in provided data.";
+    }
+
+    let formatted = `Summary: ${knowledge.summary}\n\nSources:`;
+    if (Array.isArray(knowledge.sources) && knowledge.sources.length > 0) {
+        formatted += knowledge.sources.map(s => `\n- ${s.title}: ${s.url}`).join("");
+    } else {
+        formatted += "\n- None provided.";
+    }
+    
+    return formatted;
 };
 
 /**

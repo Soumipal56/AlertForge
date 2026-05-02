@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 import ApiError from "../utils/ApiError.js";
+import { fetchTavilyInsights } from "./ai/tavily.service.js";
 import incidentModel from "../model/Incident.model.js";
 import timelineEventModel from "../model/TimelineEvent.model.js";
 import postmortemModel from "../model/Postmortem.model.js";
 import warRoomMessageModel from "../model/WarRoomMessage.model.js";
 import { runPostmortemGraph } from "./ai/langgraph.service.js";
-import { normalizeGraphInput } from "./ai/utils/formatter.js";
 import { searchSimilarIncidents, storeIncidentInPinecone, storeChatInPinecone, storePostmortemInPinecone } from "./ai/utils/pinecone.js";
+import { formatChatContext, buildDebuggingTimeline, normalizeGraphInput } from "./ai/utils/formatter.js";
 import { PostmortemOutputSchema } from "./ai/utils/parser.js";
 
 /**
@@ -31,23 +32,31 @@ const loadPostmortemContext = async (incidentId) => {
 
     const [timeline, chatMessages] = await Promise.all([
         timelineEventModel.find({ incidentId }).sort({ createdAt: 1 }).lean(),
-        warRoomMessageModel.find({ roomId: incidentId }).sort({ createdAt: 1 }).lean(),
+        warRoomMessageModel.find({ roomId: incidentId }).sort({ createdAt: -1 }).limit(50).lean(),
     ]);
 
-    // Format chat messages
-    const chat = chatMessages.map(msg => `${msg.sender?.name || "System"}: ${msg.content}`).join("\n");
+    // Format chat for reasoning context (ASC order)
+    const chat = formatChatContext(chatMessages);
 
-    // Get similar incidents from Pinecone (already formatted as string)
+    // Build Step-by-step reconstruction
+    const debuggingTimeline = buildDebuggingTimeline(timeline, chatMessages);
+
+    // Get similar incidents from Pinecone
     const similarIncidents = await searchSimilarIncidents(incident);
+
+    // Fetch fresh structured insights for the postmortem
+    const externalKnowledge = await fetchTavilyInsights(incident.message, incident.service, incident.severity);
+    console.log("[DEBUG] External Knowledge:", externalKnowledge);
 
     const context = normalizeGraphInput({
         incident,
         timeline,
         chat,
         similarIncidents,
+        externalKnowledge,
     });
 
-    return { context, chatMessages };
+    return { context, chatMessages, debuggingTimeline, externalKnowledge };
 };
 
 /**
@@ -71,12 +80,19 @@ export const generatePostmortem = async (incidentId) => {
         return existingPostmortem;
     }
 
-    const { context, chatMessages } = await loadPostmortemContext(incidentId);
+    const { context, chatMessages, debuggingTimeline, externalKnowledge } = await loadPostmortemContext(incidentId);
+    
+    console.log("[FINAL CHECK]", {
+        hasExternal: !!externalKnowledge?.summary,
+        summary: externalKnowledge?.summary?.slice(0, 100)
+    });
+
     const graphResult = await runPostmortemGraph({
         incident: context.incident,
         timeline: context.timeline,
         chat: context.chat,
         similarIncidents: context.similarIncidents,
+        externalKnowledge: context.externalKnowledge,
     });
 
     // Store the incident and chat in Pinecone asynchronously after postmortem generation
@@ -102,6 +118,8 @@ export const generatePostmortem = async (incidentId) => {
         contributingFactors: validatedOutput.data.contributingFactors,
         actionItems: validatedOutput.data.actionItems,
         learnings: validatedOutput.data.learnings,
+        debuggingTimeline: debuggingTimeline || validatedOutput.data.debuggingTimeline,
+        externalKnowledge: validatedOutput.data.externalKnowledge,
         aiConfidence: validatedOutput.data.confidence,
     };
 
