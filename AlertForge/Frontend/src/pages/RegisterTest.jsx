@@ -12,7 +12,7 @@ const RegisterTest = () => {
         setResult(null);
         setError('');
         try {
-            const response = await api.post('/auth/register', { email, password });
+            const response = await api.post('/api/auth/register', { email, password });
             setResult(response.data);
         } catch (err) {
             setError(err.response?.data?.message || 'Registration failed');

@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import ApiError from "../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/token.js";
 import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants.js";
-import { createUserDAO, findUserByEmailDAO, findUserByEmailWithPasswordDAO, findUserByIdDAO } from "../dao/user.dao.js";
+import { createUserDAO, findUserByEmailDAO, findUserByEmailWithPasswordDAO, findUserByIdDAO, updateUserByIdDAO } from "../dao/user.dao.js";
 import { createApiKeyDAO } from "../dao/apikey.dao.js";
 import { generateApiKey } from "../utils/generateApiKey.js";
 import { hashKey } from "../utils/hashKey.js";
@@ -86,6 +86,53 @@ export const loginService = async ({ email, password }) => {
         accessToken: generateAccessToken(userId),
         refreshToken: generateRefreshToken(userId),
     };
+};
+
+export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail) {
+        throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email is required from Google");
+    }
+
+    // Find user by email
+    let user = await findUserByEmailDAO(normalizedEmail);
+
+    if (user) {
+        // User exists - update googleId if missing
+        if (!user.googleId) {
+            user = await updateUserByIdDAO(user._id, { googleId });
+        }
+        return user;
+    }
+
+    // User doesn't exist - create new user
+    try {
+        user = await createUserDAO({
+            email: normalizedEmail,
+            emailAddress: normalizedEmail,
+            name,
+            googleId,
+            avatar,
+            isVerified: true, // Google emails are verified
+            role: "buyer", // default role
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            // Handle duplicate key error (email or googleId)
+            const duplicateField = Object.keys(error.keyPattern || {})[0];
+            const message = duplicateField === "email"
+                ? "User already exists with this email"
+                : duplicateField === "googleId"
+                    ? "Google account already linked to another user"
+                    : `Duplicate user index conflict: ${duplicateField || "unknown"}`;
+
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, message);
+        }
+        throw error;
+    }
+
+    return user;
 };
 
 export const refreshAccessTokenService = async (refreshToken) => {

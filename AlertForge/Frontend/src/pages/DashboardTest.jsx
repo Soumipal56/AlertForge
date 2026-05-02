@@ -17,7 +17,7 @@ const DashboardTest = () => {
             if (err.response?.status === 401) {
                 console.log("Access token expired, attempting refresh...");
                 try {
-                    await api.post('/auth/refresh');
+                    await api.post('/api/auth/refresh');
                     // Retry original request
                     const retryResponse = await api.get('/api/incidents');
                     setIncidents(retryResponse.data.data || []);
@@ -35,7 +35,7 @@ const DashboardTest = () => {
 
     const handleLogout = async () => {
         try {
-            await api.post('/auth/logout');
+            await api.post('/api/auth/logout');
             navigate('/test-login');
         } catch (err) {
             console.error("Logout failed", err);

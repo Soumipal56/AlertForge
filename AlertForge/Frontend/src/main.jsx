@@ -6,6 +6,8 @@ import { ClerkProvider } from "@clerk/react";
 import { dark } from "@clerk/ui/themes";
 import { TooltipProvider } from "./components/ui/tooltip";
 
+import { AuthProvider } from "./context/AuthContext";
+
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!PUBLISHABLE_KEY) {
@@ -21,8 +23,11 @@ createRoot(document.getElementById("root")).render(
           theme: dark,
         }}
       >
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </ClerkProvider>
     </TooltipProvider>
   </StrictMode>,
 );
+

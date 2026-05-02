@@ -20,6 +20,8 @@ import RegisterTest from "@/pages/RegisterTest";
 import LoginTest from "@/pages/LoginTest";
 import DashboardTest from "@/pages/DashboardTest";
 
+import ProtectedRoute from "@/components/ProtectedRoute";
+
 export const routes = createBrowserRouter([
   {
     path: "/test-register",
@@ -31,7 +33,11 @@ export const routes = createBrowserRouter([
   },
   {
     path: "/test-dashboard",
-    element: <DashboardTest />,
+    element: (
+      <ProtectedRoute>
+        <DashboardTest />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/sso-callback",
@@ -43,11 +49,19 @@ export const routes = createBrowserRouter([
   // },
   {
     path: "/war-room-chat",
-    element: <WarRoomChat />,
+    element: (
+      <ProtectedRoute>
+        <WarRoomChat />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/warroom/:incidentId",
-    element: <WarRoomChat />,
+    element: (
+      <ProtectedRoute>
+        <WarRoomChat />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/",
@@ -63,8 +77,13 @@ export const routes = createBrowserRouter([
   },
   {
     path: "/dashboard",
-    element: <DashboardLayout />,
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
     children: [
+
       {
         index: true,
         element: <Overview />,

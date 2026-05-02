@@ -17,6 +17,25 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        trim: true,
+    },
+    avatar: {
+        type: String,
+        default: null,
+    },
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
+    role: {
+        type: String,
+        enum: ['admin', 'developer'],
+        default: 'admin',
+    },
     teamEmails: [
         {
             type: String,
