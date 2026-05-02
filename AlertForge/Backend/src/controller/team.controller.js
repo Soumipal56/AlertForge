@@ -94,25 +94,35 @@ export const inviteTeamMember = async (req, res, next) => {
 /**
  * PATCH /api/team/role
  * Updates a team member's role.
- * Body: { memberId, role }
- * Only admin can change roles.
+ * Body: { userId, role }
  */
 export const updateTeamMemberRole = async (req, res, next) => {
     try {
         const organizationId = req.user?.userId;
-        const { memberId, role } = req.body;
+        const { userId, memberId, role } = req.body;
+        const targetId = userId || memberId;
+
+        if (!targetId) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Member ID (userId) is required");
+        }
+
+        // Prevent admin from changing their own role in the team management route
+        if (targetId === organizationId) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "You cannot change your own organization role here.");
+        }
 
         const validRoles = ["responder", "viewer"];
         if (!validRoles.includes(role)) {
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Role must be 'responder' or 'viewer'");
         }
 
-        const updated = await updateUserRoleDAO(memberId, organizationId, role);
+        const updated = await updateUserRoleDAO(targetId, organizationId, role);
         if (!updated) {
-            throw new ApiError(HTTP_STATUS.NOT_FOUND, "Team member not found");
+            throw new ApiError(HTTP_STATUS.NOT_FOUND, "Team member not found in your organization");
         }
 
         return res.json(new ApiResponse(HTTP_STATUS.OK, "Role updated", updated));
+
     } catch (error) {
         next(error);
     }
