@@ -32,7 +32,12 @@ export const registerService = async ({ email, password }) => {
         });
     } catch (error) {
         if (error?.code === 11000) {
-            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "User already exists");
+            const duplicateField = Object.keys(error.keyPattern || {})[0];
+            const message = duplicateField === "email"
+                ? "User already exists"
+                : `Duplicate user index conflict: ${duplicateField || "unknown"}`;
+
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, message);
         }
 
         throw error;

@@ -53,7 +53,7 @@ export const uptimerobotWebhook = async (req, res, next) => {
         }
 
         const incident = await createIncidentService(incidentData);
-        sendIncidentNotification(incident, apiKeyDoc.clerkId);
+        sendIncidentNotification(incident, apiKeyDoc.user?._id || apiKeyDoc.user);
         emitNewIncident(incident);
 
         return res.status(HTTP_STATUS.CREATED).json(new ApiResponse(HTTP_STATUS.CREATED, "Alert processed", incident));
