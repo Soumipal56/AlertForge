@@ -81,11 +81,16 @@ export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, 
         sender: buildSenderIdentity(apiKey, user),
     });
 
-    // Store asynchronously to avoid blocking the main chat flow
-    storeChatInPinecone(message, roomId).catch(err => {
-        console.error("[ChatService] Failed to store chat in Pinecone:", err);
-    });
+    console.log("[DB] Chat saved successfully");
 
+    // Store asynchronously to avoid blocking the main chat flow
+    console.log("[Pinecone] Storing chat vector");
+    storeChatInPinecone([message], roomId).then(() => {
+        // Success is logged inside storeChatInPinecone
+    }).catch(err => {
+        console.error("[Pinecone] Chat store failed:", err.message);
+    });
+    
     return message;
 };
 

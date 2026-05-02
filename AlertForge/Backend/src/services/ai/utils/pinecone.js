@@ -59,7 +59,21 @@ export const storeIncidentInPinecone = async (incident) => {
             }
         };
 
-        await pineconeIndex.upsert([record]);
+        const records = [record];
+
+        console.log("[DEBUG] Incident Input:", incident._id);
+        console.log("[DEBUG] Generated Text:", text);
+        console.log("[DEBUG] Embedding Length:", embedding?.length);
+        console.log("[DEBUG] Records:", records.length);
+
+        if (!records || records.length === 0) {
+            console.warn("[Pinecone] No valid records → skipping upsert");
+            return;
+        }
+
+        console.log("[Pinecone] Final Payload:", { records: records });
+
+        await pineconeIndex.upsert({ records: records });
         console.log(`[Pinecone] Successfully stored incident ${incident._id}`);
     } catch (error) {
         console.error("[Pinecone] Failed to store incident:", error);
@@ -84,10 +98,27 @@ export const storeChatInPinecone = async (messages, roomId) => {
         const records = [];
 
         for (const message of messages) {
-            // Skip empty messages
-            if (!message || !message.content || message.content.trim() === "") continue;
+            // Check content and fileUrl
+            const hasContent = typeof message.content === "string" && message.content.trim() !== "";
+            const hasFile = !!message.fileUrl;
 
-            const content = message.content.substring(0, 500); 
+            // If both content & fileUrl empty -> SKIP
+            if (!hasContent && !hasFile) {
+                console.warn("[Pinecone] Skipped chat message: Empty content and no file");
+                continue;
+            }
+
+            // Prepare text
+            let content = hasContent ? message.content.trim() : "";
+            
+            // If content is empty (but it has fileUrl) -> skip or use fileUrl?
+            // "If content is empty -> SKIP"
+            if (!content) {
+                console.warn("[Pinecone] Skipped chat message: Empty text");
+                continue;
+            }
+
+            content = content.substring(0, 500); 
             const senderName = message.sender?.name || "System";
             const text = `${senderName}: ${content}`;
             
@@ -99,23 +130,30 @@ export const storeChatInPinecone = async (messages, roomId) => {
                         values: embedding,
                         metadata: {
                             type: "chat",
-                            roomId: roomId.toString(),
+                            incidentId: roomId.toString(),
                             sender: senderName,
+                            content: content, // include content in metadata per requirements
                             createdAt: message.createdAt ? new Date(message.createdAt).toISOString() : new Date().toISOString()
                         }
                     });
                 }
             } catch (err) {
-                console.warn(`[Embedding] Failed for text: ${text.substring(0, 50)}...`, err.message);
+                console.warn(`[Pinecone] Embedding failed for text: ${text.substring(0, 50)}...`, err.message);
             }
         }
 
-        if (records.length > 0) {
-            await pineconeIndex.upsert(records);
-            console.log(`[Pinecone] Successfully stored ${records.length} chat messages for room ${roomId}`);
-        } else {
-            console.log("[Pinecone] No valid chat records to upsert");
+        console.log("[DEBUG] Chat Input count:", messages.length);
+        console.log("[DEBUG] Records built:", records.length);
+
+        if (!records || records.length === 0) {
+            console.warn("[Pinecone] No valid records → skipping upsert");
+            return;
         }
+
+        console.log("[Pinecone] Final Payload:", { records: records });
+
+        await pineconeIndex.upsert({ records: records });
+        console.log(`[Pinecone] Stored ${records.length} records successfully for room ${roomId}`);
     } catch (error) {
         console.error("[Pinecone] Failed to store chat:", error);
     }
@@ -167,6 +205,69 @@ export const searchSimilarIncidents = async (incident) => {
     } catch (error) {
         console.error("[Pinecone] Search failed:", error);
         return "";
+    }
+};
+
+/**
+ * Store a finalized postmortem report in Pinecone
+ * PREPARE FOR FUTURE SEARCH: Metadata includes type, incidentId, and service.
+ */
+export const storePostmortemInPinecone = async (postmortem, incident) => {
+    if (!pineconeIndex) {
+        console.warn("[Pinecone] Skipping postmortem storage: Client not initialized");
+        return;
+    }
+
+    if (!postmortem || !postmortem.summary) {
+        console.warn("[Pinecone] Skipping postmortem storage: Invalid postmortem object");
+        return;
+    }
+
+    try {
+        const service = incident?.service || "unknown";
+        
+        // Construct a dense, meaningful string for the embedding model to digest
+        // We include rootCause and learnings as they are the most valuable for future AI context
+        const text = `Service: ${service}\nSummary: ${postmortem.summary}\nRoot Cause: ${postmortem.rootCause}\nLearnings: ${postmortem.learnings}`;
+        
+        const embedding = await embedText(text);
+
+        if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+            console.warn(`[Pinecone] Skipping postmortem ${postmortem._id || postmortem.incidentId}: Embedding failed`);
+            return;
+        }
+
+        const incidentIdStr = (postmortem.incidentId || incident?._id || "unknown").toString();
+
+        const record = {
+            id: `postmortem_${incidentIdStr}`,
+            values: embedding,
+            metadata: {
+                type: "postmortem",
+                incidentId: incidentIdStr,
+                service: service,
+                createdAt: postmortem.createdAt ? new Date(postmortem.createdAt).toISOString() : new Date().toISOString()
+            }
+        };
+
+        const records = [record];
+
+        console.log("[DEBUG] Postmortem Input incidentId:", incidentIdStr);
+        console.log("[DEBUG] Generated Text length:", text.length);
+        console.log("[DEBUG] Embedding Length:", embedding?.length);
+        console.log("[DEBUG] Records:", records.length);
+
+        if (!records || records.length === 0) {
+            console.warn("[Pinecone] No valid records → skipping upsert");
+            return;
+        }
+
+        console.log("[Pinecone] Final Payload:", { records: records });
+
+        await pineconeIndex.upsert({ records: records });
+        console.log(`[Pinecone] Stored 1 records successfully for postmortem ${incidentIdStr}`);
+    } catch (error) {
+        console.error("[Pinecone] Failed to store postmortem:", error);
     }
 };
 

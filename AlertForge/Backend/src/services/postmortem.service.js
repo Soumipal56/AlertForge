@@ -6,7 +6,7 @@ import postmortemModel from "../model/Postmortem.model.js";
 import warRoomMessageModel from "../model/WarRoomMessage.model.js";
 import { runPostmortemGraph } from "./ai/langgraph.service.js";
 import { normalizeGraphInput } from "./ai/utils/formatter.js";
-import { searchSimilarIncidents, storeIncidentInPinecone, storeChatInPinecone } from "./ai/utils/pinecone.js";
+import { searchSimilarIncidents, storeIncidentInPinecone, storeChatInPinecone, storePostmortemInPinecone } from "./ai/utils/pinecone.js";
 import { PostmortemOutputSchema } from "./ai/utils/parser.js";
 
 /**
@@ -105,8 +105,9 @@ export const generatePostmortem = async (incidentId) => {
         aiConfidence: validatedOutput.data.confidence,
     };
 
+    let savedPostmortem;
     try {
-        return await postmortemModel.findOneAndUpdate(
+        savedPostmortem = await postmortemModel.findOneAndUpdate(
             { incidentId: context.incident._id },
             {
                 $setOnInsert: documentPayload,
@@ -119,9 +120,18 @@ export const generatePostmortem = async (incidentId) => {
         ).lean();
     } catch (error) {
         if (error?.code === 11000) {
-            return await postmortemModel.findOne({ incidentId }).lean();
+            savedPostmortem = await postmortemModel.findOne({ incidentId }).lean();
+        } else {
+            throw error;
         }
-
-        throw error;
     }
+
+    // Now store the postmortem in Pinecone!
+    // Since postmortem generation is complete and we have the final DB object,
+    // we can safely store it async without blocking the response.
+    storePostmortemInPinecone(savedPostmortem, context.incident).catch(err => {
+        console.error("[Postmortem] Failed to store postmortem in vector DB:", err);
+    });
+
+    return savedPostmortem;
 };
