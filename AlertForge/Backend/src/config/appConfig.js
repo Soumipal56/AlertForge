@@ -32,7 +32,8 @@ const appConfig = {
         apiKey: process.env.PINECONE_API_KEY,
         host: process.env.PINECONE_HOST,
         index: process.env.PINECONE_INDEX
-    }
+    },
+    CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
 };
 
 export default appConfig;
