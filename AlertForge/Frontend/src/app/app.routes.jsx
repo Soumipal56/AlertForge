@@ -15,7 +15,6 @@ import Team from "@/features/pages/dashboard/Team";
 import Integrations from "@/features/pages/dashboard/Integrations";
 import Services from "@/features/pages/dashboard/Services";
 import { Overview } from "@/features/pages/dashboard/Overview";
-// import DashboardLayout from "@/features/pages/dashboard/Dashboard";
 import RegisterTest from "@/pages/RegisterTest";
 import LoginTest from "@/pages/LoginTest";
 import DashboardTest from "@/pages/DashboardTest";
@@ -95,10 +94,6 @@ export const routes = createBrowserRouter([
         path: "integrations",
         element: <Integrations />,
       },
-      // {
-      //   path: "integrations/api-keys",
-      //   element: <ApiKeys />,
-      // },
       {
         path: "status",
         element: <StatusPage />,
