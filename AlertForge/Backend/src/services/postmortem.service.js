@@ -171,3 +171,37 @@ export const generatePostmortem = async (incidentId, apiKeyId) => {
 
     return savedPostmortem;
 };
+
+/**
+ * FEATURE-5: Manually updates postmortem fields (summary, rootCause, actionItems, etc.)
+ * Validates ownership via apiKeyId before applying updates.
+ * Input: incidentId, apiKeyId, { summary, rootCause, ... }
+ * Output: updated postmortem document
+ * Throws: 404 if incident not found, 404 if no postmortem exists yet
+ */
+export const updatePostmortemService = async (incidentId, apiKeyId, updates) => {
+    validateObjectId(incidentId);
+
+    if (!apiKeyId) {
+        throw new ApiError(401, "Authentication required");
+    }
+
+    // Validate incident ownership
+    const incident = await incidentModel.exists({ _id: incidentId, apiKeyId });
+    if (!incident) {
+        throw new ApiError(404, "Incident not found");
+    }
+
+    const postmortem = await postmortemModel.findOneAndUpdate(
+        { incidentId },
+        { $set: updates },
+        { returnDocument: "after", runValidators: true }
+    ).lean();
+
+    if (!postmortem) {
+        throw new ApiError(404, "Postmortem not found. Generate it first by resolving the incident.");
+    }
+
+    return postmortem;
+};
+

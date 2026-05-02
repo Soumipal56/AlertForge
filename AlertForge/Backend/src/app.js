@@ -10,6 +10,12 @@ import userRouter from "./routes/user.routes.js";
 import webhookRouter from "./routes/webhook.routes.js";
 import postmortemRouter from "./routes/postmortem.routes.js";
 import authRouter from "./routes/auth.routes.js";
+// FEATURE-6: Service Registry
+import serviceRouter from "./routes/service.routes.js";
+// FEATURE-8: Team System
+import teamRouter from "./routes/team.routes.js";
+// FEATURE-9: Public Status Page
+import statusPageRouter from "./routes/statusPage.routes.js";
 
 import { publicApiLimiter } from "./middleware/rateLimiter/index.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
@@ -21,7 +27,6 @@ app.use(morgan('dev'));
 app.use(publicApiLimiter);
 
 //NOTE -  Middleware
-//NOTE -  Middleware
 app.use(cors({
     origin: ["http://localhost:5173", "http://localhost:3000"], // Support both standard React/Vite ports
     credentials: true,
@@ -30,7 +35,6 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
-
 
 // Initialize Passport for Google OAuth
 app.use(passport.initialize());
@@ -47,7 +51,14 @@ app.use(`/api/webhooks`, webhookRouter)
 app.use(`/api/postmortem`, postmortemRouter)
 app.use(`/postmortem`, postmortemRouter)
 app.use(`/api`, uploadRouter)
+// New feature routes
+app.use(`/api/services`, serviceRouter)
+app.use(`/api/team`, teamRouter)
+app.use(`/api/status-page`, statusPageRouter)
 
 app.use(errorHandler);
 
 export default app;
+
+
+

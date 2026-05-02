@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+// FEATURE-8/10: User model with RBAC roles and team membership
 const userSchema = new mongoose.Schema({
     email: {
         type: String,
@@ -31,10 +32,18 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    // FEATURE-10: RBAC — admin creates org, responder handles incidents, viewer is read-only
     role: {
         type: String,
-        enum: ['admin', 'developer'],
-        default: 'admin',
+        enum: ["admin", "responder", "viewer"],
+        default: "admin",
+    },
+    // The owning admin's userId — for multi-tenant team scoping
+    // Admin's own userId will match _id; team members will have the admin's id here
+    organizationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
     },
     teamEmails: [
         {
@@ -89,3 +98,4 @@ const userSchema = new mongoose.Schema({
 const userModel = mongoose.model("User", userSchema);
 
 export default userModel;
+

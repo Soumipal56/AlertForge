@@ -1,13 +1,17 @@
 import express from "express";
-import { createApiKey } from "../controller/apikey.controller.js";
-import { publicApiLimiter } from "../middleware/rateLimiter/index.js";
-import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
+import { createApiKey, listApiKeys, revokeApiKey } from "../controller/apikey.controller.js";
+import { authApiLimiter, criticalApiLimiter, publicApiLimiter } from "../middleware/rateLimiter/index.js";
+import { smartAuth } from "../middleware/smartAuth.middleware.js";
 
 const apiKeyRouter = express.Router();
 
-apiKeyRouter.use(authMiddleware);
-apiKeyRouter.use(attachApiKey);
+// All API key management requires dashboard session (cookie auth)
+apiKeyRouter.use(smartAuth);
 
-apiKeyRouter.post("/", publicApiLimiter, createApiKey);
+// FEATURE-7: Full API key management
+apiKeyRouter.get("/", authApiLimiter, listApiKeys);
+apiKeyRouter.post("/", criticalApiLimiter, createApiKey);
+apiKeyRouter.delete("/:id", criticalApiLimiter, revokeApiKey);
 
 export default apiKeyRouter;
+
