@@ -30,10 +30,10 @@ export const getIncidentByIdDAO = async (id) => {
  * @param {string} status - The new status to set for the incident
  * @returns {Object} The updated incident document from the database, or null if not found
  */
-export const updateIncidentStatusDAO = async (id, status) => {
+export const updateIncidentStatusDAO = async (id, status, extraUpdates = {}) => {
     return await incidentModel.findByIdAndUpdate(
         id,
-        { status },
-        { returnDocument: "after" }
+        { $set: { status, ...extraUpdates } },
+        { returnDocument: "after", runValidators: true }
     );
 };

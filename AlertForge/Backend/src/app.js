@@ -4,6 +4,7 @@ import morgan from 'morgan'
 import incidentRouter from "./routes/incident.routes.js";
 import apiKeyRouter from "./routes/apikey.routes.js";
 import uploadRouter from "./routes/upload.routes.js";
+import postmortemRouter from "./routes/postmortem.routes.js";
 
 import { publicApiLimiter } from "./middleware/rateLimiter/index.js";
 
@@ -27,6 +28,7 @@ app.get(`/`, (req, res) => {
 })
 app.use(`/api/apikeys`, apiKeyRouter)
 app.use(`/api/incidents`, incidentRouter)
+app.use(`/api/postmortem`, postmortemRouter)
 app.use(`/api`, uploadRouter)
 
 

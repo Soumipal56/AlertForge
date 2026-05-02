@@ -6,6 +6,8 @@ import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from "../config/constan
 import { sendIncidentNotification } from "../services/notification/notification.service.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
 import { createTimelineEventService } from "../services/timeline/timeline.service.js";
+import { generatePostmortem } from "../services/postmortem.service.js";
+import { INCIDENT_STATUS } from "../config/constants.js";
 
 const buildIncidentSocketPayload = (incident) => ({
     id: incident?._id?.toString?.() || incident?.id || null,
@@ -144,12 +146,21 @@ export const updateIncidentStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+        const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "";
 
-        const updated = await updateIncidentStatusService(id, status);
+        if (!Object.values(INCIDENT_STATUS).includes(normalizedStatus)) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid incident status");
+        }
 
-        if (!updated) {
+        const currentIncident = await getIncidentByIdService(id);
+
+        if (!currentIncident) {
             throw new ApiError(404, "Incident not found");
         }
+
+        const isResolvedTransition = currentIncident.status !== INCIDENT_STATUS.RESOLVED && normalizedStatus === INCIDENT_STATUS.RESOLVED;
+        const updatePayload = isResolvedTransition ? { resolvedAt: new Date() } : {};
+        const updated = await updateIncidentStatusService(id, normalizedStatus, updatePayload);
 
         await saveTimelineEntry("incident.status_changed", updated, `Status changed to ${updated.status}`);
         emitIncidentUpdate(updated);
@@ -157,6 +168,18 @@ export const updateIncidentStatus = async (req, res, next) => {
             type: "incident.status_changed",
             incident: buildIncidentSocketPayload(updated),
         });
+
+        if (isResolvedTransition) {
+            await saveTimelineEntry("incident.resolved", updated, "Incident resolved");
+            emitTimelineEvent({
+                type: "incident.resolved",
+                incident: buildIncidentSocketPayload(updated),
+            });
+
+            void generatePostmortem(updated?._id?.toString?.() || id).catch((error) => {
+                console.error("[Postmortem] Generation failed:", error.message);
+            });
+        }
 
         return res.json(new ApiResponse(200, "Incident updated", updated));
     } catch (error) {

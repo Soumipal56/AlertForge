@@ -9,7 +9,14 @@ const timelineEventSchema = new mongoose.Schema(
         type: {
             type: String,
             required: true,
-            enum: ["incident.created", "incident.status_changed"],
+            enum: [
+                "incident.created",
+                "incident.status_changed",
+                "responder.assigned",
+                "root_cause.identified",
+                "fix.deployed",
+                "incident.resolved"
+            ]
         },
         incidentId: {
             type: mongoose.Schema.Types.ObjectId,
