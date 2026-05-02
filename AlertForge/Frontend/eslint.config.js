@@ -23,7 +23,14 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^[A-Z_]',
+          // PascalCase bindings from `({ icon: Icon }) => …` are args; used as `<Icon />`.
+          argsIgnorePattern: '^[A-Z_]',
+        },
+      ],
     },
   },
 ])
