@@ -30,6 +30,6 @@ export const getIncidentByIdService = async (id) => {
  * @param {string} status - The new status to set for the incident
  * @returns {Object} The updated incident document from the database, or null if not found
  */
-export const updateIncidentStatusService = async (id, status) => {
-    return await updateIncidentStatusDAO(id, status);
+export const updateIncidentStatusService = async (id, status, extraUpdates = {}) => {
+    return await updateIncidentStatusDAO(id, status, extraUpdates);
 };

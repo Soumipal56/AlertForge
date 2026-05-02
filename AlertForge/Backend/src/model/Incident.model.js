@@ -7,7 +7,7 @@ import { INCIDENT_STATUS, SEVERITY } from "../config/constants.js";
  * @property {string} message - Description of the incident
  * @property {string} service - Affected service or component
  * @property {string} severity - Severity level (low, medium, high)
- * @property {string} status - Current status of the incident (open, resolved)
+ * @property {string} status - Current status of the incident (open, investigating, identified, monitoring, resolved)
  * @property {Date} createdAt - Timestamp when the incident was created
  * @property {Date} updatedAt - Timestamp when the incident was last updated
  * @description Mongoose schema and model for an Incident in the AlertForge system
@@ -30,6 +30,18 @@ const incidentSchema = new mongoose.Schema({
         type: String,
         enum: Object.values(INCIDENT_STATUS),
         default: INCIDENT_STATUS.OPEN,
+    },
+    impact: {
+        type: String, // "payments failed", "500 users affected"
+    },
+
+    resolvedAt: {
+        type: Date,
+    },
+
+    // metadata for AI
+    metadata: {
+        type: Object, // webhook payload / logs
     },
     /**
      * Ownership ID (API Key reference).
