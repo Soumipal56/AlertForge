@@ -4,6 +4,16 @@ export const createApiKeyDAO = async (data) => {
     return await apiKeyModel.create(data);
 };
 
+export const findActiveApiKeyByHashedKeyDAO = async (hashedKey) => {
+    return await apiKeyModel
+        .findOne({
+            key: hashedKey,
+            isActive: true,
+        })
+        .populate("user")
+        .lean();
+};
+
 export const findActiveApiKeyByUserDAO = async (userId) => {
     return await apiKeyModel
         .findOne({
