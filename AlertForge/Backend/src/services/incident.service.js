@@ -1,4 +1,4 @@
-import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO,updateIncidentStatusDAO } from "../dao/incident.dao.js";
+import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO, updateIncidentStatusDAO } from "../dao/incident.dao.js";
 import { fetchTavilyInsights } from "./ai/tavily.service.js";
 
 /**  
@@ -20,8 +20,8 @@ export const createIncidentService = async (data) => {
  * @description Service function to retrieve all incidents from the database
  * @returns {Array} List of incident documents from the database
  */
-export const getAllIncidentsService = async () => {
-    return await getAllIncidentsDAO();
+export const getAllIncidentsService = async (apiKeyId) => {
+    return await getAllIncidentsDAO(apiKeyId);
 };
 
 /**  
@@ -29,8 +29,8 @@ export const getAllIncidentsService = async () => {
  * @param {string} id - The ID of the incident to retrieve
  * @returns {Object} The incident document from the database, or null if not found
  */
-export const getIncidentByIdService = async (id) => {
-    return await getIncidentByIdDAO(id);
+export const getIncidentByIdService = async (id, apiKeyId) => {
+    return await getIncidentByIdDAO(id, apiKeyId);
 };
 
 /**  
@@ -39,6 +39,6 @@ export const getIncidentByIdService = async (id) => {
  * @param {string} status - The new status to set for the incident
  * @returns {Object} The updated incident document from the database, or null if not found
  */
-export const updateIncidentStatusService = async (id, status, extraUpdates = {}) => {
-    return await updateIncidentStatusDAO(id, status, extraUpdates);
+export const updateIncidentStatusService = async (id, apiKeyId, status, extraUpdates = {}) => {
+    return await updateIncidentStatusDAO(id, apiKeyId, status, extraUpdates);
 };

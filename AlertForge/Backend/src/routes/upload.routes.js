@@ -2,14 +2,22 @@ import express from "express";
 import { uploadMiddleware } from "../middleware/upload.middleware.js";
 import { handleFileUpload } from "../controller/upload.controller.js";
 import { heavyApiLimiter } from "../middleware/rateLimiter/index.js";
+import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 /**
  * @route POST /api/upload
  * @description Uploads a file (image/pdf) to cloud storage and returns the URL.
- * @access Public (Protected by client-side auth in practice)
+ * @access Private
  */
-router.post("/upload", heavyApiLimiter, uploadMiddleware.single("file"), handleFileUpload);
+router.post(
+    "/upload",
+    authMiddleware,
+    attachApiKey,
+    heavyApiLimiter,
+    uploadMiddleware.single("file"),
+    handleFileUpload
+);
 
 export default router;

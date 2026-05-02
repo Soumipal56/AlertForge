@@ -5,18 +5,18 @@ import { sendTelegramNotification } from "./telegram.service.js";
 import User from "../../model/User.model.js";
 
 /**  
- * Sends an incident notification to the user associated with the clerkId.
+ * Sends an incident notification to the authenticated user.
  * @param {Object} data - The incident data.
- * @param {string} clerkId - The Clerk ID of the user to notify.
+ * @param {string} userId - The MongoDB user ID to notify.
  * @returns {Promise<void>}
  */
-export const sendIncidentNotification = async (data, clerkId) => {
+export const sendIncidentNotification = async (data, userId) => {
     try {
         // Fetch user notification settings
-        const settings = await User.findOne({ clerkId });
+        const settings = await User.findById(userId);
 
         if (!settings) {
-            console.warn(`No notification settings found for user: ${clerkId}`);
+            console.warn(`No notification settings found for user: ${userId}`);
             // Fallback for demo or if data.to is provided
             if (data.to) {
                 await sendIncidentEmail({

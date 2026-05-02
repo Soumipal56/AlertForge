@@ -1,12 +1,13 @@
 import express from "express";
-import { validateApiKey } from "../middleware/apiKey.middleware.js";
+import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
 import { authApiLimiter, criticalApiLimiter } from "../middleware/rateLimiter/index.js";
 import { createIncident, getAllIncidents, getIncidentById, updateIncidentStatus } from "../controller/incident.controller.js";
 
 
 const incidentRouter = express.Router();
 
-incidentRouter.use(validateApiKey);
+incidentRouter.use(authMiddleware);
+incidentRouter.use(attachApiKey);
 incidentRouter.use(authApiLimiter);
 
 incidentRouter.post("/", createIncident);

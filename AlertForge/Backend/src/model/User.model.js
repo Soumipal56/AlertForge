@@ -1,18 +1,17 @@
 import mongoose from "mongoose";
 
-/**
- * @typedef {Object} UserNotificationSettings
- * @property {string} clerkId - The unique ID from Clerk
- * @property {string} telegramChatId - The user's specific Telegram Chat ID
- * @property {string} discordWebhookUrl - The user's specific Discord/Slack Webhook URL
- * @property {Object} preferences - Toggle switches for different channels
- */
 const userSchema = new mongoose.Schema({
-    clerkId: {
+    email: {
         type: String,
-        required: true,
         unique: true,
+        sparse: true,
+        lowercase: true,
+        trim: true,
         index: true,
+    },
+    password: {
+        type: String,
+        select: false,
     },
     telegramChatId: {
         type: String,

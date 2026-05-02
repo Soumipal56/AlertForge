@@ -9,7 +9,7 @@ import { generatePostmortem, getPostmortemByIncidentIdService } from "../service
 export const getPostmortemByIncidentId = async (req, res, next) => {
     try {
         const { incidentId } = req.params;
-        const postmortem = await getPostmortemByIncidentIdService(incidentId);
+        const postmortem = await getPostmortemByIncidentIdService(incidentId, req.apiKey._id);
 
         if (!postmortem) {
             throw new ApiError(HTTP_STATUS.NOT_FOUND, "Postmortem not found");
@@ -34,7 +34,7 @@ export const getPostmortemByIncidentId = async (req, res, next) => {
 export const generatePostmortemController = async (req, res, next) => {
     try {
         const { incidentId } = req.params;
-        const postmortem = await generatePostmortem(incidentId);
+        const postmortem = await generatePostmortem(incidentId, req.apiKey._id);
 
         return res.json(
             new ApiResponse(

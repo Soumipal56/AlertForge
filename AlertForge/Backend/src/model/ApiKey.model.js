@@ -22,9 +22,10 @@ const apiKeySchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
-    
-    clerkId: {
-        type: String,
+
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
         required: true,
         index: true,
     }
@@ -32,6 +33,14 @@ const apiKeySchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+apiKeySchema.index(
+    { user: 1, isActive: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { isActive: true },
+    }
+);
 
 const apiKeyModel = mongoose.model("ApiKey", apiKeySchema);
 

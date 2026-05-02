@@ -58,7 +58,7 @@ export const createIncident = async (req, res, next) => {
         });
         await saveTimelineEntry("incident.created", incident, incident?.message || "");
         // Send notification to the user who owns this API key
-        sendIncidentNotification(incident, req.apiKey.clerkId);
+        sendIncidentNotification(incident, req.user.userId);
         emitNewIncident(incident);
         emitTimelineEvent({
             type: "incident.created",
@@ -88,7 +88,7 @@ export const createIncident = async (req, res, next) => {
  */
 export const getAllIncidents = async (req, res, next) => {
     try {
-        const incidents = await getAllIncidentsService();
+        const incidents = await getAllIncidentsService(req.apiKey._id);
 
         return res.json(new ApiResponse(
             HTTP_STATUS.OK,
@@ -116,7 +116,7 @@ export const getIncidentById = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const incident = await getIncidentByIdService(id);
+        const incident = await getIncidentByIdService(id, req.apiKey._id);
 
         if (!incident) {
             throw new ApiError(404, "Incident not found");
@@ -150,7 +150,7 @@ export const updateIncidentStatus = async (req, res, next) => {
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid incident status");
         }
 
-        const currentIncident = await getIncidentByIdService(id);
+        const currentIncident = await getIncidentByIdService(id, req.apiKey._id);
 
         if (!currentIncident) {
             throw new ApiError(404, "Incident not found");
@@ -158,7 +158,7 @@ export const updateIncidentStatus = async (req, res, next) => {
 
         const isResolvedTransition = currentIncident.status !== INCIDENT_STATUS.RESOLVED && normalizedStatus === INCIDENT_STATUS.RESOLVED;
         const updatePayload = isResolvedTransition ? { resolvedAt: new Date() } : {};
-        const updated = await updateIncidentStatusService(id, normalizedStatus, updatePayload);
+        const updated = await updateIncidentStatusService(id, req.apiKey._id, normalizedStatus, updatePayload);
 
         await saveTimelineEntry("incident.status_changed", updated, `Status changed to ${updated.status}`);
         emitIncidentUpdate(updated);
@@ -176,7 +176,7 @@ export const updateIncidentStatus = async (req, res, next) => {
 
             try {
                 // Generate the postmortem immediately so the database stays in sync with the resolved state.
-                await generatePostmortem(updated?._id?.toString?.() || id);
+                await generatePostmortem(updated?._id?.toString?.() || id, req.apiKey._id);
             } catch (error) {
                 // The incident update must still succeed even if AI generation fails.
                 console.error("[Postmortem] Generation failed:", error.message);

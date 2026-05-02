@@ -23,8 +23,9 @@ const validateObjectId = (incidentId) => {
  * Loads the incident, its timeline, and up to three similar incidents.
  * The service keeps data access here so the LangGraph layer stays focused on AI reasoning.
  */
-const loadPostmortemContext = async (incidentId) => {
-    const incident = await incidentModel.findById(incidentId).lean();
+const loadPostmortemContext = async (incidentId, apiKeyId) => {
+    const incidentQuery = apiKeyId ? { _id: incidentId, apiKeyId } : { _id: incidentId };
+    const incident = await incidentModel.findOne(incidentQuery).lean();
 
     if (!incident) {
         throw new ApiError(404, "Incident not found");
@@ -62,8 +63,13 @@ const loadPostmortemContext = async (incidentId) => {
 /**
  * Fetches a previously stored postmortem for a single incident.
  */
-export const getPostmortemByIncidentIdService = async (incidentId) => {
+export const getPostmortemByIncidentIdService = async (incidentId, apiKeyId) => {
     validateObjectId(incidentId);
+
+    const incident = await incidentModel.exists({ _id: incidentId, apiKeyId });
+    if (!incident) {
+        throw new ApiError(404, "Incident not found");
+    }
 
     return await postmortemModel.findOne({ incidentId }).lean();
 };
@@ -72,15 +78,22 @@ export const getPostmortemByIncidentIdService = async (incidentId) => {
  * Generates and persists a postmortem once an incident is resolved.
  * LangGraph performs the step-by-step reasoning, while this service owns persistence.
  */
-export const generatePostmortem = async (incidentId) => {
+export const generatePostmortem = async (incidentId, apiKeyId = null) => {
     validateObjectId(incidentId);
 
     const existingPostmortem = await postmortemModel.findOne({ incidentId }).lean();
     if (existingPostmortem) {
+        if (apiKeyId) {
+            const incident = await incidentModel.exists({ _id: incidentId, apiKeyId });
+            if (!incident) {
+                throw new ApiError(404, "Incident not found");
+            }
+        }
+
         return existingPostmortem;
     }
 
-    const { context, chatMessages, debuggingTimeline, externalKnowledge } = await loadPostmortemContext(incidentId);
+    const { context, chatMessages, debuggingTimeline, externalKnowledge } = await loadPostmortemContext(incidentId, apiKeyId);
     
     console.log("[FINAL CHECK]", {
         hasExternal: !!externalKnowledge?.summary,

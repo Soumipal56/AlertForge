@@ -7,13 +7,14 @@ import { createApiKeyService } from "../services/apikey.service.js";
 
 export const createApiKey = async (req, res, next) => {
     try {
-        const { name, clerkId } = req.body || {}; // clerkId should eventually come from req.auth
+        const { name } = req.body || {};
+        const userId = req.user?.userId;
         const rawKey = generateApiKey();
         const hashedKey = hashKey(rawKey);
         const apiKeyName = typeof name === "string" ? name.trim() : "";
 
-        if (!clerkId) {
-            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "User ID (clerkId) is required to create an API key");
+        if (!userId) {
+            throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required to create an API key");
         }
 
         await createApiKeyService({
@@ -21,7 +22,7 @@ export const createApiKey = async (req, res, next) => {
             name: apiKeyName || undefined,
             serviceName: apiKeyName || undefined,
             isActive: true,
-            clerkId,
+            user: userId,
         });
 
         return res.status(HTTP_STATUS.CREATED).json(

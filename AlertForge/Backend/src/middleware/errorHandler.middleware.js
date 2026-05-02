@@ -1,4 +1,4 @@
-import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants";
+import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants.js";
 
 export const errorHandler = (err, req, res, next) => {
     console.error(err); // Log the error for debugging  

@@ -33,7 +33,8 @@ const appConfig = {
         host: process.env.PINECONE_HOST,
         index: process.env.PINECONE_INDEX
     },
-    CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+    jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
+    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
     tavilyApiKey: process.env.TAVILY_API_KEY,
 };
 
