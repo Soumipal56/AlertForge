@@ -27,22 +27,27 @@ const incidentSchema = new mongoose.Schema({
     severity: {
         type: String,
         enum: Object.values(SEVERITY),
-        default: SEVERITY.MEDIUM,
+        default: SEVERITY.P3,
     },
     status: {
         type: String,
         enum: Object.values(INCIDENT_STATUS),
-        default: INCIDENT_STATUS.ACTIVE,
+        default: INCIDENT_STATUS.INVESTIGATING,
     },
-
-
-    impact: {
-        type: String, // "payments failed", "500 users affected"
+    startedAt: {
+        type: Date,
+        default: Date.now,
     },
-
     resolvedAt: {
         type: Date,
     },
+    responders: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+        }
+    ],
+
 
     // metadata for AI
     metadata: {

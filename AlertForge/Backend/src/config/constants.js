@@ -44,7 +44,8 @@ export const INCIDENT_STATUS = {
 
 
 export const SEVERITY = {
-    LOW: "low",
-    MEDIUM: "medium",
-    HIGH: "high",
+    P1: "P1",
+    P2: "P2",
+    P3: "P3",
 };
+

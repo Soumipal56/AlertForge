@@ -1,8 +1,8 @@
-import { createIncidentService, getAllIncidentsService, getIncidentByIdService, updateIncidentStatusService } from "../services/incident.service.js";
+import { createIncidentService, getAllIncidentsService, getIncidentByIdService, updateIncidentStatusService, updateIncidentSeverityService } from "../services/incident.service.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
-import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, INCIDENT_STATUS } from "../config/constants.js";
+import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, INCIDENT_STATUS, SEVERITY } from "../config/constants.js";
 import { sendIncidentNotifications } from "../services/notification/notification.service.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
 import { createTimelineEventService } from "../services/timeline/timeline.service.js";
@@ -10,7 +10,7 @@ import { generatePostmortem } from "../services/postmortem.service.js";
 
 const buildIncidentSocketPayload = (incident) => ({
     id: incident?._id?.toString?.() || incident?.id || null,
-    message: incident?.message,
+    title: incident?.title || incident?.message,
     severity: incident?.severity,
     status: incident?.status,
     createdAt: incident?.createdAt,
@@ -55,8 +55,9 @@ export const createIncident = async (req, res, next) => {
         const incident = await createIncidentService({
             ...data,
             apiKeyId: req.apiKey._id,
-        });
-        await saveTimelineEntry("incident.created", incident, incident?.message || "");
+        }, req.user?.userId);
+        
+        await saveTimelineEntry("incident.created", incident, incident?.title || incident?.message || "");
 
         // Multi-channel notification fan-out
         const user = req.apiKey.user;
@@ -144,14 +145,8 @@ export const getIncidentById = async (req, res, next) => {
 
 /**  
  * @description Controller function to update the status of an incident
- * - Extracts the incident ID from the request parameters and new status from the request body
- * - Calls the service function to update the incident status in the database
- * - If the incident is not found, throws a 404 error
- * - Returns a standardized API response with the updated incident data if found
- * @param {Object} req - Express request object containing incident ID in req.params and new status in req.body
- * @param {Object} res - Express response object used to send the API response
- * @param {Function} next - Express next function for error handling
- * @returns {Object} API response with status code, message, and updated incident data if found
+ * - Validates lifecycle transitions via Service layer
+ * - Triggers Timeline, Sockets, and AI Postmortem
  */
 export const updateIncidentStatus = async (req, res, next) => {
     try {
@@ -159,19 +154,8 @@ export const updateIncidentStatus = async (req, res, next) => {
         const { status } = req.body;
         const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "";
 
-        if (!Object.values(INCIDENT_STATUS).includes(normalizedStatus)) {
-            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid incident status");
-        }
-
-        const currentIncident = await getIncidentByIdService(id, req.apiKey._id);
-
-        if (!currentIncident) {
-            throw new ApiError(404, "Incident not found");
-        }
-
-        const isResolvedTransition = currentIncident.status !== INCIDENT_STATUS.RESOLVED && normalizedStatus === INCIDENT_STATUS.RESOLVED;
-        const updatePayload = isResolvedTransition ? { resolvedAt: new Date() } : {};
-        const updated = await updateIncidentStatusService(id, req.apiKey._id, normalizedStatus, updatePayload);
+        // Service layer handles transition validation and resolvedAt timestamp
+        const updated = await updateIncidentStatusService(id, req.apiKey._id, normalizedStatus);
 
         await saveTimelineEntry("incident.status_changed", updated, `Status changed to ${updated.status}`);
         emitIncidentUpdate(updated);
@@ -180,7 +164,8 @@ export const updateIncidentStatus = async (req, res, next) => {
             incident: buildIncidentSocketPayload(updated),
         });
 
-        if (isResolvedTransition) {
+        // Trigger resolution logic
+        if (normalizedStatus === INCIDENT_STATUS.RESOLVED) {
             await saveTimelineEntry("incident.resolved", updated, "Incident resolved");
             emitTimelineEvent({
                 type: "incident.resolved",
@@ -188,16 +173,40 @@ export const updateIncidentStatus = async (req, res, next) => {
             });
 
             try {
-                // Generate the postmortem immediately so the database stays in sync with the resolved state.
+                // Generate the postmortem immediately
                 await generatePostmortem(updated?._id?.toString?.() || id, req.apiKey._id);
             } catch (error) {
-                // The incident update must still succeed even if AI generation fails.
                 console.error("[Postmortem] Generation failed:", error.message);
             }
         }
 
-        return res.json(new ApiResponse(200, "Incident updated", updated));
+        return res.json(new ApiResponse(200, "Incident status updated", updated));
     } catch (error) {
         next(error);
     }
 };
+
+/**
+ * @description Controller function to update the severity of an incident
+ */
+export const updateIncidentSeverity = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { severity } = req.body;
+        const normalizedSeverity = typeof severity === "string" ? severity.trim().toUpperCase() : "";
+
+        const updated = await updateIncidentSeverityService(id, req.apiKey._id, normalizedSeverity);
+
+        await saveTimelineEntry("incident.severity_changed", updated, `Severity changed to ${updated.severity}`);
+        emitIncidentUpdate(updated);
+        emitTimelineEvent({
+            type: "incident.severity_changed",
+            incident: buildIncidentSocketPayload(updated),
+        });
+
+        return res.json(new ApiResponse(200, "Incident severity updated", updated));
+    } catch (error) {
+        next(error);
+    }
+};
+

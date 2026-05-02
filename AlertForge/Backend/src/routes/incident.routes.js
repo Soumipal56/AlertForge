@@ -1,7 +1,8 @@
 import express from "express";
 import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
 import { authApiLimiter, criticalApiLimiter } from "../middleware/rateLimiter/index.js";
-import { createIncident, getAllIncidents, getIncidentById, updateIncidentStatus } from "../controller/incident.controller.js";
+import { createIncident, getAllIncidents, getIncidentById, updateIncidentStatus, updateIncidentSeverity } from "../controller/incident.controller.js";
+
 import { smartAuth } from "../middleware/smartAuth.middleware.js";
 
 
@@ -14,6 +15,8 @@ incidentRouter.post("/", createIncident);
 incidentRouter.get("/", getAllIncidents);
 incidentRouter.get("/:id", getIncidentById);
 incidentRouter.patch("/:id/status", criticalApiLimiter, updateIncidentStatus);
+incidentRouter.patch("/:id/severity", criticalApiLimiter, updateIncidentSeverity);
+
 
 
 export default incidentRouter;

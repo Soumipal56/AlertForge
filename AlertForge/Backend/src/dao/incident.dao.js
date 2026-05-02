@@ -69,6 +69,20 @@ export const getIncidentByIdDAO = async (id, apiKeyId) => {
 };
 
 /**  
+ * @description DAO function to update the severity of an incident in the database
+ * @param {string} id - The ID of the incident to update
+ * @param {string} severity - The new severity to set for the incident
+ * @returns {Object} The updated incident document from the database
+ */
+export const updateIncidentSeverityDAO = async (id, apiKeyId, severity) => {
+    return await incidentModel.findOneAndUpdate(
+        { _id: id, apiKeyId },
+        { $set: { severity } },
+        { returnDocument: "after", runValidators: true }
+    ).lean();
+};
+
+/**  
  * @description DAO function to update the status of an incident in the database
  * @param {string} id - The ID of the incident to update
  * @param {string} status - The new status to set for the incident
@@ -79,5 +93,6 @@ export const updateIncidentStatusDAO = async (id, apiKeyId, status, extraUpdates
         { _id: id, apiKeyId },
         { $set: { status, ...extraUpdates } },
         { returnDocument: "after", runValidators: true }
-    );
+    ).lean();
 };
+
