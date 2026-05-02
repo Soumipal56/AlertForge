@@ -21,14 +21,16 @@ app.use(morgan('dev'));
 app.use(publicApiLimiter);
 
 //NOTE -  Middleware
+//NOTE -  Middleware
 app.use(cors({
-    origin: "http://localhost:5173", // Update with your frontend URL
-    methods: ["GET", "POST", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: ["http://localhost:5173", "http://localhost:3000"], // Support both standard React/Vite ports
     credentials: true,
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
 }));
 app.use(express.json());
 app.use(cookieParser());
+
 
 // Initialize Passport for Google OAuth
 app.use(passport.initialize());

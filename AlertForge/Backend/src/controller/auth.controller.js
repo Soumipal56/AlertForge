@@ -34,13 +34,21 @@ export const login = async (req, res, next) => {
         res.cookie("accessToken", accessToken, accessTokenCookieOptions);
         res.cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
 
-        return res.status(HTTP_STATUS.OK).json(
-            new ApiResponse(HTTP_STATUS.OK, "Login successful", { user })
-        );
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: "Login successful",
+            data: {
+                user: {
+                    id: user._id,
+                    email: user.email,
+                }
+            }
+        });
     } catch (error) {
         next(error);
     }
 };
+
 
 export const refresh = async (req, res, next) => {
     try {
