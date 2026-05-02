@@ -36,14 +36,15 @@ export const deactivateActiveApiKeysByUserDAO = async (userId) => {
     );
 };
 
-// FEATURE-7: List all keys for a user (excludes the hashed key value for security)
+// FEATURE-7: List all active keys for a user (excludes the hashed key value for security)
 export const findApiKeysByUserDAO = async (userId) => {
     return await apiKeyModel
-        .find({ user: userId })
+        .find({ user: userId, isActive: true })
         .select("-key") // Never expose hashed key
         .sort({ createdAt: -1 })
         .lean();
 };
+
 
 // FEATURE-7: Soft-delete a specific key by ID, scoped to owner
 export const deactivateApiKeyByIdDAO = async (keyId, userId) => {
