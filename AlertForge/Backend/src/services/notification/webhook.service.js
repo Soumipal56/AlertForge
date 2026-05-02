@@ -1,5 +1,5 @@
-export const sendWebhookNotification = async (data) => {
-    const webhookUrl = process.env.WEBHOOK_URL;
+export const sendWebhookNotification = async (data, dynamicUrl = null) => {
+    const webhookUrl = dynamicUrl || process.env.WEBHOOK_URL;
     if (!webhookUrl) return;
 
     try {

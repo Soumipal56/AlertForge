@@ -21,6 +21,12 @@ const apiKeySchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true,
+    },
+    
+    clerkId: {
+        type: String,
+        required: true,
+        index: true,
     }
 
 }, {
