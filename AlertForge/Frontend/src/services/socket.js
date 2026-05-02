@@ -34,7 +34,7 @@ export const initializeSocket = (apiKey = "", name = "") => {
         transports: ["websocket", "polling"],
         autoConnect: true,
         auth: {
-            token: normalizedKey,
+            apiKey: normalizedKey,
             name: normalizedName,
         },
     });
