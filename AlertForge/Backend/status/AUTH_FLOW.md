@@ -1,105 +1,98 @@
-# Project Architecture Documentation
+# 🔐 Authentication & Middleware Flow
 
-## Overview
+## 🧠 Overview
 
-**AlertForge Backend** is a production-ready incident management and monitoring system built on a robust, scalable architecture. It follows a strictly decoupled **Layered Architecture** (Controller -> Service -> DAO) to ensure maintainability, testability, and clear separation of concerns.
-
-The system is designed with security as a priority, implementing cookie-based JWT authentication and a scoped API key system that ensures users can only access data associated with their active credentials.
+The AlertForge authentication system is a robust, security-first implementation designed to protect sensitive incident data while providing a seamless developer experience. It utilizes a **dual-token JWT strategy** (Access + Refresh) combined with **HttpOnly cookies** to eliminate common web vulnerabilities like XSS and CSRF. Every request to a protected resource undergoes a multi-stage validation process that not only verifies the user's identity but also automatically attaches their active service-level API credentials.
 
 ---
 
-## Authentication Flow
+## 🔐 Authentication System
 
-The system uses a dual-token strategy (Access + Refresh) delivered via secure, HttpOnly cookies to mitigate XSS risks.
+The system relies on two types of JSON Web Tokens (JWT) to manage session state:
 
-### Request-Response Cycle
+| Token Type              | Lifespan   | Purpose                                                                     | Storage                            |
+| :---------------------- | :--------- | :-------------------------------------------------------------------------- | :--------------------------------- |
+| **Access Token**  | 15 Minutes | Used for authorizing every individual API request. Contains the `userId`. | HttpOnly Cookie (`accessToken`)  |
+| **Refresh Token** | 7 Days     | Used to obtain a new Access Token when the current one expires.             | HttpOnly Cookie (`refreshToken`) |
+
+### 🛠️ Token Lifecycle
+
+1. **Generation**: Upon successful `/auth/login` or `/auth/register`, both tokens are signed and sent to the client.
+2. **Verification**: The `authMiddleware` intercepts requests, extracts the `accessToken` from cookies, and verifies its signature.
+3. **Rotation**: When the `accessToken` expires, the frontend calls `/auth/refresh`. If the `refreshToken` is valid, a new `accessToken` is issued.
+
+---
+
+## 🍪 Cookie Configuration
+
+To ensure maximum security, tokens are never exposed to JavaScript. The backend uses the following configuration (found in `src/config/cookieOptions.js`):
+
+```javascript
+const authCookieOptions = {
+    httpOnly: true, // Prevents XSS: JavaScript cannot read the cookie
+    secure: process.env.NODE_ENV === "production", // HTTPS only in production
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // CSRF protection
+    path: "/",
+};
+
+export const accessTokenCookieOptions = {
+    ...authCookieOptions,
+    maxAge: 15 * 60 * 1000, // 15 Minutes
+};
+
+export const refreshTokenCookieOptions = {
+    ...authCookieOptions,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 Days
+};
+```
+
+---
+
+## 🔄 Full Authentication Flow
+
+The following diagram illustrates the lifecycle of a request from authentication to business logic execution:
 
 ```mermaid
 flowchart TD
-    A[Client Request] --> B{Auth Middleware}
-    B -- Token Valid --> C{Attach API Key}
-    B -- Token Missing or Expired --> D[/auth/refresh/]
-    D -- Valid Refresh Token --> E[New Access Token Set in Cookie]
-    E --> B
-    D -- Invalid Refresh Token --> F[401 Unauthorized]
-    C -- API Key Found --> G[Controller Layer]
-    C -- No Active API Key --> H[401 Unauthorized]
-    G --> I[Service Layer]
-    I --> J[DAO Layer]
-    J --> K[(MongoDB)]
+    A[Login/Register] --> B[Generate Tokens]
+    B --> C[Set Cookies]
+    C --> D[Protected Request]
+    D --> E{authMiddleware}
+  
+    E -->|Valid| F[attachApiKey]
+    F --> G[Controller]
+  
+    E -->|Expired| H[/auth/refresh/]
+    H --> I[New Access Token]
+    I --> C
 ```
 
-### 1. Token Generation and Verification
+### 1. `authMiddleware` (Identity Verification)
 
-- **Access Tokens**: Short-lived (15 minutes), used for authorizing individual requests.
-- **Refresh Tokens**: Long-lived (7 days), stored in the database or verified via secret to issue new access tokens without requiring user re-login.
-- **Verification**: Handled via `jsonwebtoken` in `src/utils/token.js`.
+- Extracts `accessToken` from `req.cookies`.
+- Validates the JWT using the `JWT_ACCESS_SECRET`.
+- Attaches the payload to `req.user = { userId: decoded.userId }`.
+- If invalid or missing, it triggers a `401 Unauthorized` via the centralized error handler.
 
-### 2. Cookie Security Configuration
+### 2. `attachApiKey` (Credential Context)
 
-Tokens are stored in the browser using the following security flags:
-
-- `httpOnly: true`: Prevents client-side scripts from accessing tokens (XSS protection).
-- `secure: true`: Production-only setting that ensures tokens are only sent over HTTPS.
-- `sameSite: "lax" / "none"`: Protects against CSRF attacks.
-
----
-
-## Layered Architecture
-
-The project is organized into four distinct layers:
-
-| Layer                              | Responsibility                                                    | Location            |
-| :--------------------------------- | :---------------------------------------------------------------- | :------------------ |
-| **Routes**                   | Defines endpoints and applies middleware chains.                  | `src/routes/`     |
-| **Controllers**              | Orchestrates HTTP lifecycle (`req`/`res`) and calls services. | `src/controller/` |
-| **Services**                 | Encapsulates business logic, validation, and complex workflows.   | `src/services/`   |
-| **DAO (Data Access Object)** | Performs direct database operations using Mongoose models.        | `src/dao/`        |
+- Executed immediately after identity is confirmed.
+- Uses `req.user.userId` to look up the user's **active** API key in the database.
+- Attaches the key object to `req.apiKey`.
+- This allows the Service layer to automatically scope all data (incidents, timelines) to the correct service without requiring the client to send a manual header.
 
 ---
 
-## Middleware Pipeline
+## 🚀 Frontend Interaction Guide
 
-Requests flow through a series of specialized middlewares before reaching the business logic:
+### 🛡️ Authentication Handlers
 
-1. **`publicApiLimiter`**: Baseline rate limiting for all incoming traffic.
-2. **`authMiddleware`**:
-   - Extracts `accessToken` from cookies.
-   - Verifies JWT validity.
-   - Attaches `userId` to `req.user`.
-3. **`attachApiKey`**:
-   - Retrieves the user's active API key from the database.
-   - Attaches the `apiKey` object to `req.apiKey` for data scoping.
-4. **`authApiLimiter`**: Tiered rate limiting for authenticated users.
+Since we use cookies with `httpOnly`, the frontend (React/Vite) should:
 
----
+1. **Enable Credentials**: Ensure all API calls (e.g., via Axios or Fetch) include `withCredentials: true` or `credentials: 'include'`.
+2. **Handle 401s**: Implement an interceptor that detects `401` errors. When detected, the client should hit the `/auth/refresh` endpoint to restore the session.
+3. **State Management**: Store user profile info (name, email) in global state (Redux/Zustand), but never attempt to store or manage the tokens themselves.
 
-## API Key System
+### 🔌 API Requests
 
-AlertForge utilizes a scoped API key system to identify services and enforce ownership:
-
-- **Storage**: API keys are hashed (`SHA-256`) before being stored in MongoDB to prevent leaks from database snapshots.
-- **Linking**: Each API key is linked to a `User` document.
-- **Scoping**: Most resources (Incidents, Postmortems) are indexed by `apiKeyId`. This ensures that even within the same user account, data can be segmented by different integrated services.
-- **Lifecycle**: Users can generate new keys via `/api/apikeys`. The system enforces a "one active key" policy per user for standard tiers.
-
----
-
-## Request Lifecycle Example: Creating an Incident
-
-1. **Client** sends `POST /api/incidents` with payload.
-2. **`authMiddleware`** validates the session cookie.
-3. **`attachApiKey`** identifies the active service key for the user.
-4. **`incidentController.createIncident`** receives the request.
-5. **`incidentService.createIncident`** validates the incident data and enriches it with `apiKeyId`.
-6. **`incidentDAO.createIncidentDAO`** executes the `Mongoose.create()` command.
-7. **Response** is returned to the client with a `201 Created` status.
-
----
-
-## Token Lifecycle Management
-
-- **Login/Register**: Both tokens are generated and set as cookies.
-- **Token Expiry**: When a request fails due to an expired access token, the client hits `/auth/refresh`.
-- **Refresh**: The server verifies the refresh token and issues a new `accessToken` cookie.
-- **Logout**: Clears both cookies and invalidates the session on the client side.
+Once logged in, the frontend simply makes requests to `/api/incidents`, `/api/postmortem`, etc. The backend automatically handles identity and API key association behind the scenes.

@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
-import { hashKey } from "../utils/hashKey.js";
-import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
+import { verifyAccessToken } from "../utils/token.js";
+import { findActiveApiKeyByUserDAO } from "../dao/apikey.dao.js";
 import {
     getRecentWarRoomMessages,
     resolveWarRoomIdFromApiKey,
@@ -28,6 +28,19 @@ const normalizeRoomName = (roomName) => {
     }
 
     return roomName.trim().toLowerCase();
+};
+
+const parseCookieHeader = (cookieHeader = "") => {
+    return cookieHeader.split(";").reduce((cookies, cookiePair) => {
+        const [name, ...valueParts] = cookiePair.trim().split("=");
+
+        if (!name || valueParts.length === 0) {
+            return cookies;
+        }
+
+        cookies[name] = decodeURIComponent(valueParts.join("="));
+        return cookies;
+    }, {});
 };
 
 /**
@@ -68,6 +81,7 @@ export const initSocket = async (httpServer) => {
         cors: {
             origin: process.env.CLIENT_URL || "http://localhost:5173",
             methods: ["GET", "POST"],
+            credentials: true,
         },
     });
 
@@ -79,18 +93,23 @@ export const initSocket = async (httpServer) => {
 
     ioInstance.use(async (socket, next) => {
         try {
-            const rawToken = socket.handshake.auth?.token;
+            const cookies = parseCookieHeader(socket.handshake.headers?.cookie);
+            const accessToken = cookies.accessToken;
             const rawName = socket.handshake.auth?.name;
 
-            if (!rawToken) {
-                return next(new Error("Authentication error: No API key provided"));
+            if (!accessToken) {
+                return next(new Error("Authentication error: No access token provided"));
             }
 
-            const hashedToken = hashKey(rawToken.trim());
-            const apiKey = await findActiveApiKeyByHashedKeyDAO(hashedToken);
+            const decoded = verifyAccessToken(accessToken);
+            if (!decoded?.userId) {
+                return next(new Error("Authentication error: Invalid access token"));
+            }
+
+            const apiKey = await findActiveApiKeyByUserDAO(decoded.userId);
 
             if (!apiKey) {
-                return next(new Error("Authentication error: Invalid or inactive API key"));
+                return next(new Error("Authentication error: No active API key found"));
             }
 
             // Store API key metadata for authorization
@@ -102,6 +121,7 @@ export const initSocket = async (httpServer) => {
 
             // Store session-based user identity
             socket.data.user = {
+                userId: decoded.userId,
                 name: typeof rawName === "string" ? rawName.trim() : null,
                 nameProvided: !!(typeof rawName === "string" && rawName.trim()),
             };
@@ -181,7 +201,7 @@ export const initSocket = async (httpServer) => {
                 }
 
                 // 1. Fetch the incident to validate it exists.
-                const incident = await getIncidentByIdService(incidentId);
+                const incident = await getIncidentByIdService(incidentId, socket.data.apiKey?.id);
                 if (!incident) {
                     throw new Error(`Incident with ID ${incidentId} not found`);
                 }
@@ -281,7 +301,7 @@ export const initSocket = async (httpServer) => {
                 // Security: Prevent messages in resolved incidents (read-only mode)
                 if (room.startsWith("incident:")) {
                     const incidentId = room.split(":")[1];
-                    const incident = await getIncidentByIdService(incidentId);
+                    const incident = await getIncidentByIdService(incidentId, socket.data.apiKey?.id);
                     
                     if (incident && incident.status === "resolved") {
                         const message = "This incident is resolved. Chat is read-only.";

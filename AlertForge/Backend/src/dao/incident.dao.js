@@ -14,8 +14,7 @@ export const createIncidentDAO = async (data) => {
  * @returns {Array} List of incident documents from the database
  */
 export const getAllIncidentsDAO = async (apiKeyId) => {
-    const query = apiKeyId ? { apiKeyId } : {};
-    return await incidentModel.find(query).sort({ createdAt: -1 });
+    return await incidentModel.find({ apiKeyId }).sort({ createdAt: -1 });
 };
 /**  
  * @description DAO function to retrieve a single incident by its ID from the database
@@ -23,8 +22,7 @@ export const getAllIncidentsDAO = async (apiKeyId) => {
  * @returns {Object} The incident document from the database, or null if not found
  */
 export const getIncidentByIdDAO = async (id, apiKeyId) => {
-    const query = apiKeyId ? { _id: id, apiKeyId } : { _id: id };
-    return await incidentModel.findOne(query);
+    return await incidentModel.findOne({ _id: id, apiKeyId });
 };
 /**  
  * @description DAO function to update the status of an incident in the database
@@ -33,10 +31,8 @@ export const getIncidentByIdDAO = async (id, apiKeyId) => {
  * @returns {Object} The updated incident document from the database, or null if not found
  */
 export const updateIncidentStatusDAO = async (id, apiKeyId, status, extraUpdates = {}) => {
-    const query = apiKeyId ? { _id: id, apiKeyId } : { _id: id };
-
     return await incidentModel.findOneAndUpdate(
-        query,
+        { _id: id, apiKeyId },
         { $set: { status, ...extraUpdates } },
         { returnDocument: "after", runValidators: true }
     );

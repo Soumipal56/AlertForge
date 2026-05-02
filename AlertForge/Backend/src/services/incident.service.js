@@ -1,5 +1,7 @@
 import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO, updateIncidentStatusDAO } from "../dao/incident.dao.js";
 import { fetchTavilyInsights } from "./ai/tavily.service.js";
+import ApiError from "../utils/ApiError.js";
+import { HTTP_STATUS } from "../config/constants.js";
 
 /**  
  * @description Service function to create a new incident by calling the corresponding DAO function
@@ -21,6 +23,10 @@ export const createIncidentService = async (data) => {
  * @returns {Array} List of incident documents from the database
  */
 export const getAllIncidentsService = async (apiKeyId) => {
+    if (!apiKeyId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    }
+
     return await getAllIncidentsDAO(apiKeyId);
 };
 
@@ -30,6 +36,10 @@ export const getAllIncidentsService = async (apiKeyId) => {
  * @returns {Object} The incident document from the database, or null if not found
  */
 export const getIncidentByIdService = async (id, apiKeyId) => {
+    if (!apiKeyId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    }
+
     return await getIncidentByIdDAO(id, apiKeyId);
 };
 
@@ -40,5 +50,9 @@ export const getIncidentByIdService = async (id, apiKeyId) => {
  * @returns {Object} The updated incident document from the database, or null if not found
  */
 export const updateIncidentStatusService = async (id, apiKeyId, status, extraUpdates = {}) => {
+    if (!apiKeyId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    }
+
     return await updateIncidentStatusDAO(id, apiKeyId, status, extraUpdates);
 };
