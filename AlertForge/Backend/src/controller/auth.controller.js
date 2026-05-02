@@ -81,7 +81,7 @@ export const googleCallback = async (req, res, next) => {
 
         // Login or create user with Google profile data
         const user = await loginWithGoogle(googleProfile);
-        
+
         const userId = user._id.toString();
         const accessToken = generateAccessToken(userId);
         const refreshToken = generateRefreshToken(userId);
@@ -91,7 +91,7 @@ export const googleCallback = async (req, res, next) => {
         res.cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
 
         // Redirect based on user role
-        const redirectPath = user.role === "seller" ? "/seller/dashboard" : "/";
+        const redirectPath = user.role === "admin" ? "/dashboard" : "/dashboard";
         return res.redirect(`${appConfig.frontendUrl}${redirectPath}`);
     } catch (error) {
         // Redirect to frontend with error message
