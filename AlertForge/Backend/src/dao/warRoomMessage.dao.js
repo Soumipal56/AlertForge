@@ -5,9 +5,21 @@ export const createWarRoomMessageDAO = async (data) => {
 };
 
 export const getRecentWarRoomMessagesDAO = async (roomId, limit = 50) => {
-    return await warRoomMessageModel
+    const messages = await warRoomMessageModel
         .find({ roomId })
         .sort({ createdAt: -1 })
-        .limit(limit);
+        .limit(limit)
+        .lean();
+    
+    return messages.reverse(); // Return in chronological order for UI
 };
+
+export const updateWarRoomTaskStatusDAO = async (messageId, isCompleted) => {
+    return await warRoomMessageModel.findByIdAndUpdate(
+        messageId,
+        { $set: { isCompleted } },
+        { new: true }
+    ).lean();
+};
+
 

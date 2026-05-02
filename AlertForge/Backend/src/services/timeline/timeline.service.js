@@ -47,4 +47,27 @@ export const getTimelineEventsByIncidentService = async (incidentId, apiKeyId, p
     return await getTimelineEventsByIncidentDAO(incidentId, page, limit);
 };
 
+/**
+ * ARCHITECTURE FIX: Internal utility for services to log events without repeated ownership checks.
+ * Use this for auto-logs (status changes, creation, etc.)
+ */
+export const autoLogTimelineEvent = async ({ incidentId, apiKeyId, type, message, metadata, user }) => {
+    try {
+        return await createTimelineEventDAO({
+            type,
+            incidentId,
+            message,
+            metadata: metadata || {},
+            createdBy: user?._id || user?.userId || null,
+            authorName: user?.name || "System",
+            isPublic: true,
+        });
+    } catch (error) {
+        // We log error but don't throw to prevent side-effect failures from crashing the main flow
+        console.error("[Timeline] Auto-log failed:", error.message);
+        return null;
+    }
+};
+
+
 

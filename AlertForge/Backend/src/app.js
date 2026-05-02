@@ -16,6 +16,9 @@ import serviceRouter from "./routes/service.routes.js";
 import teamRouter from "./routes/team.routes.js";
 // FEATURE-9: Public Status Page
 import statusPageRouter from "./routes/statusPage.routes.js";
+// FEATURE-4: War Room
+import warRoomRouter from "./routes/warroom.routes.js";
+
 
 import { publicApiLimiter } from "./middleware/rateLimiter/index.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
@@ -55,6 +58,8 @@ app.use(`/api`, uploadRouter)
 app.use(`/api/services`, serviceRouter)
 app.use(`/api/team`, teamRouter)
 app.use(`/api/status-page`, statusPageRouter)
+app.use(`/api/warroom`, warRoomRouter)
+
 
 app.use(errorHandler);
 

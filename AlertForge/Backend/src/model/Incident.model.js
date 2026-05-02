@@ -31,6 +31,7 @@ const incidentSchema = new mongoose.Schema({
         type: String,
         enum: Object.values(INCIDENT_STATUS),
         default: INCIDENT_STATUS.INVESTIGATING,
+        index: true,
     },
     startedAt: {
         type: Date,
