@@ -6,6 +6,7 @@ import incidentRouter from "./routes/incident.routes.js";
 import apiKeyRouter from "./routes/apikey.routes.js";
 import uploadRouter from "./routes/upload.routes.js";
 import userRouter from "./routes/user.routes.js";
+import webhookRouter from "./routes/webhook.routes.js";
 import postmortemRouter from "./routes/postmortem.routes.js";
 import authRouter from "./routes/auth.routes.js";
 
@@ -36,6 +37,7 @@ app.use(`/auth`, authRouter)
 app.use(`/api/apikeys`, apiKeyRouter)
 app.use(`/api/incidents`, incidentRouter)
 app.use(`/api/users`, userRouter)
+app.use(`/api/webhooks`, webhookRouter)
 app.use(`/api/postmortem`, postmortemRouter)
 app.use(`/postmortem`, postmortemRouter)
 app.use(`/api`, uploadRouter)
