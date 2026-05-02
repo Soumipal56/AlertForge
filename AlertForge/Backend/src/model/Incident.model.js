@@ -13,6 +13,9 @@ import { INCIDENT_STATUS, SEVERITY } from "../config/constants.js";
  * @description Mongoose schema and model for an Incident in the AlertForge system
  */
 const incidentSchema = new mongoose.Schema({
+    title: {
+        type: String,
+    },
     message: {
         type: String,
         required: true,
@@ -29,8 +32,10 @@ const incidentSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: Object.values(INCIDENT_STATUS),
-        default: INCIDENT_STATUS.OPEN,
+        default: INCIDENT_STATUS.ACTIVE,
     },
+
+
     impact: {
         type: String, // "payments failed", "500 users affected"
     },

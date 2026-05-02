@@ -36,24 +36,28 @@ export const getAllIncidentsService = async (apiKeyId, status = "all") => {
     // 3. Transform aggregation into a clean counts object with defaults
     const counts = {
         all: 0,
+        active: 0,
         investigating: 0,
         identified: 0,
         monitoring: 0,
         resolved: 0,
-        open: 0, // Inclusion for system consistency
     };
+
+
+    const validStatuses = Object.keys(counts).filter(k => k !== "all");
 
     let total = 0;
     aggregation.forEach(item => {
-        if (counts.hasOwnProperty(item._id)) {
+        if (validStatuses.includes(item._id)) {
             counts[item._id] = item.count;
+            total += item.count;
         }
-        total += item.count;
     });
     counts.all = total;
 
     return { incidents, counts };
 };
+
 
 
 /**  

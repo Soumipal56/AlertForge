@@ -94,10 +94,11 @@ export const getAllIncidents = async (req, res, next) => {
         const { status } = req.query;
         const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "all";
 
-        const validStatuses = ["all", "open", "investigating", "identified", "monitoring", "resolved"];
+        const validStatuses = ["all", "investigating", "identified", "monitoring", "resolved","active"];
         if (!validStatuses.includes(normalizedStatus)) {
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid status filter");
         }
+
 
         const { incidents, counts } = await getAllIncidentsService(req.apiKey._id, normalizedStatus);
 
