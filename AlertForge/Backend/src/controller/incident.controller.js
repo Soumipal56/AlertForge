@@ -1,12 +1,82 @@
-import { createIncidentService, getAllIncidentsService, getIncidentByIdService, updateIncidentStatusService, updateIncidentSeverityService } from "../services/incident.service.js";
+import { 
+    createIncidentService, 
+    getAllIncidentsService, 
+    getIncidentByIdService, 
+    updateIncidentStatusService, 
+    updateIncidentSeverityService 
+} from "../services/incident.service.js";
+import { 
+    getTimelineEventsByIncidentService,
+    createTimelineEventService
+} from "../services/timeline/timeline.service.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, INCIDENT_STATUS, SEVERITY } from "../config/constants.js";
 import { sendIncidentNotifications } from "../services/notification/notification.service.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
-import { createTimelineEventService } from "../services/timeline/timeline.service.js";
+import { createTimelineEventService as internalCreateTimelineService } from "../services/timeline/timeline.service.js";
 import { generatePostmortem } from "../services/postmortem.service.js";
+
+// ... existing buildIncidentSocketPayload and saveTimelineEntry ...
+
+/**
+ * @description Controller function to retrieve the timeline of an incident
+ */
+export const getIncidentTimeline = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { limit } = req.query;
+
+        const timeline = await getTimelineEventsByIncidentService(
+            id, 
+            req.apiKey._id, 
+            limit ? parseInt(limit) : 50
+        );
+
+        return res.json(new ApiResponse(200, "Timeline fetched", timeline));
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @description Controller function to add a manual note/event to the timeline
+ */
+export const addTimelineNote = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { message, metadata } = req.body;
+
+        if (!message) {
+            throw new ApiError(400, "Message is required for timeline note");
+        }
+
+        const incident = await getIncidentByIdService(id, req.apiKey._id);
+        if (!incident) {
+            throw new ApiError(404, "Incident not found");
+        }
+
+        const timelineEvent = await createTimelineEventService({
+            type: "manual_note",
+            incidentId: id,
+            message,
+            metadata: metadata || {},
+            createdBy: req.user?.userId || null,
+        });
+
+        emitTimelineEvent({
+            type: "manual_note",
+            incident: buildIncidentSocketPayload(incident),
+            event: timelineEvent
+        });
+
+        return res.status(201).json(new ApiResponse(201, "Note added to timeline", timelineEvent));
+    } catch (error) {
+        next(error);
+    }
+};
+
 
 const buildIncidentSocketPayload = (incident) => ({
     id: incident?._id?.toString?.() || incident?.id || null,
@@ -17,18 +87,20 @@ const buildIncidentSocketPayload = (incident) => ({
     updatedAt: incident?.updatedAt,
 });
 
-const saveTimelineEntry = async (type, incident, message = "") => {
+const saveTimelineEntry = async (type, incident, message = "", metadata = {}) => {
     // Save timeline event after incident changes so the activity feed survives refreshes.
     try {
         await createTimelineEventService({
             type,
             incidentId: incident?._id?.toString?.() || incident?.id,
             message,
+            metadata,
         });
     } catch (error) {
         console.error("[Timeline] Failed to persist timeline entry:", error.message);
     }
 };
+
 
 /**  
  * @description Controller function to create a new incident

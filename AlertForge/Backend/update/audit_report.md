@@ -44,52 +44,30 @@ Backend/
 - **Model**: `Incident.model.js` tracks severity, status, service, and resolution timestamps.
 - **Features**: Automatic timeline logging and AI postmortem trigger upon resolution.
 
-### 3.3 War Room / Socket Module
+### 3.3 Incident Timeline System
+- **Routes**: `GET /api/incidents/:id/timeline`, `POST /api/incidents/:id/timeline`.
+- **Controllers**: Integrated into `incident.controller.js`.
+- **Flow**: Automatically logs status/severity changes. Supports manual notes from responders.
+- **Real-time**: Emits `timeline:event` via Socket.IO for live activity feeds.
+
+### 3.4 War Room / Socket Module
 - **Real-time Logic**: Powered by Socket.IO with a Redis adapter for scalability.
-- **Rooms**: Dynamic rooms created for `incident:${id}` and `${serviceName}`.
-- **Events**:
-    - `chat:message`: Real-time conversation persistence.
-    - `room:presence`: Live responder count tracking.
-    - `incident:update`: Instant dashboard synchronization.
+... (keep rest)
 
-### 3.4 Postmortem Module
-- **AI Flow**: Uses **LangGraph** (Mistral/Anthropic) to analyze incident timelines.
-- **Nodes**: Summary -> Root Cause -> Action Items -> Learning -> Validator.
-- **Storage**: `Postmortem.model.js` stores structured AI outputs and external knowledge (Tavily).
-
-### 3.5 Integration Module
-- **UptimeRobot**: Dedicated webhook controller (`/api/webhooks/uptimerobot`) that handles standard and Discord-formatted payloads.
-- **SDK**: Generic ingestion endpoint compatible with any backend reporting tool via API Keys.
-
----
-
-## 4. Database Models Summary
-
-| Model | Purpose | Key Fields |
-| :--- | :--- | :--- |
-| **User** | Identity & Settings | `email`, `role`, `notificationSettings`, `teamEmails`. |
-| **Incident** | Core Event Tracking | `message`, `service`, `severity`, `status`, `resolvedAt`. |
-| **ApiKey** | Authentication | `key` (hashed), `user`, `serviceName`. |
-| **Service** | Asset Registry | `name`, `status` (operational/degraded/outage). |
-| **TimelineEvent** | Activity Feed | `type`, `incidentId`, `message`. |
-| **Postmortem** | Post-Incident Analysis | `incidentId`, `summary`, `rootCause`, `actionItems`. |
-| **WarRoomMessage** | Real-time Chat | `roomId`, `content`, `fileUrl`, `sender`. |
-
----
+### 3.5 Postmortem Module
+... (keep rest)
 
 ## 5. API Overview
-
-### Auth
-- `POST /api/auth/register` - Create account
-- `POST /api/auth/login` - Standard login
-- `GET /api/auth/google` - OAuth initiation
-- `GET /api/auth/me` - Fetch current user profile
 
 ### Incidents
 - `GET /api/incidents` - List all incidents
 - `POST /api/incidents` - Manually create incident
 - `GET /api/incidents/:id` - Fetch single incident details
 - `PATCH /api/incidents/:id/status` - Update status (e.g., Resolve)
+- `PATCH /api/incidents/:id/severity` - Update severity (P1, P2, P3)
+- `GET /api/incidents/:id/timeline` - Fetch incident activity feed
+- `POST /api/incidents/:id/timeline` - Add manual note to timeline
+
 
 ### War Room & Messaging
 - `GET /api/chat/history/:roomId` - Fetch historical messages

@@ -11,10 +11,14 @@ export const createTimelineEventService = async (data) => {
 
 /**
  * Loads recent timeline events for a single incident.
+ * Ensures the incident is within the user's API Key scope.
  * @param {string} incidentId
+ * @param {string} apiKeyId
  * @param {number} limit
  * @returns {Promise<Array>}
  */
-export const getTimelineEventsByIncidentService = async (incidentId, limit = 50) => {
-    return await getTimelineEventsByIncidentDAO(incidentId, limit);
+export const getTimelineEventsByIncidentService = async (incidentId, apiKeyId, limit = 50) => {
+    const safeLimit = Math.min(limit, 100); // Prevent excessive data fetching
+    return await getTimelineEventsByIncidentDAO(incidentId, apiKeyId, safeLimit);
 };
+
