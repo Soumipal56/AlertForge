@@ -14,36 +14,30 @@ export const createIncidentDAO = async (data) => {
 /**  
  * @description DAO function to retrieve all incidents from the database, sorted by creation date
  * Supports optional status-based filtering.
- * @returns {Array} List of incident documents from the database
  */
-export const getAllIncidentsDAO = async (apiKeyId, status = null) => {
-    const query = { apiKeyId };
+export const getAllIncidentsDAO = async (organizationId, status = null) => {
+    const query = { organizationId };
     if (status && status !== "all") {
         query.status = status;
     }
     
     const incidents = await incidentModel.find(query).sort({ createdAt: -1 }).lean();
     
-    // Standardize 'message' -> 'title' mapping
     return incidents.map(incident => ({
         ...incident,
         title: incident.title || incident.message
     }));
 };
 
-
-
 /**
  * @description DAO function to aggregate incident counts grouped by status.
- * Filters for only valid statuses and scopes by API Key.
- * @returns {Array} List of counts per status.
  */
-export const getIncidentCountsDAO = async (apiKeyId) => {
+export const getIncidentCountsDAO = async (organizationId) => {
     const validStatuses = Object.values(INCIDENT_STATUS);
     return await incidentModel.aggregate([
         { 
             $match: { 
-                apiKeyId: new mongoose.Types.ObjectId(apiKeyId),
+                organizationId: new mongoose.Types.ObjectId(organizationId),
                 status: { $in: validStatuses }
             } 
         },
@@ -51,15 +45,11 @@ export const getIncidentCountsDAO = async (apiKeyId) => {
     ]);
 };
 
-
-
 /**  
  * @description DAO function to retrieve a single incident by its ID from the database
- * @param {string} id - The ID of the incident to retrieve
- * @returns {Object} The incident document from the database, or null if not found
  */
-export const getIncidentByIdDAO = async (id, apiKeyId) => {
-    const incident = await incidentModel.findOne({ _id: id, apiKeyId }).lean();
+export const getIncidentByIdDAO = async (id, organizationId) => {
+    const incident = await incidentModel.findOne({ _id: id, organizationId }).lean();
     if (!incident) return null;
     
     return {
@@ -69,30 +59,47 @@ export const getIncidentByIdDAO = async (id, apiKeyId) => {
 };
 
 /**  
- * @description DAO function to update the severity of an incident in the database
- * @param {string} id - The ID of the incident to update
- * @param {string} severity - The new severity to set for the incident
- * @returns {Object} The updated incident document from the database
+ * @description DAO function to update the severity of an incident
  */
-export const updateIncidentSeverityDAO = async (id, apiKeyId, severity) => {
+export const updateIncidentSeverityDAO = async (id, organizationId, severity) => {
     return await incidentModel.findOneAndUpdate(
-        { _id: id, apiKeyId },
+        { _id: id, organizationId },
         { $set: { severity } },
         { returnDocument: "after", runValidators: true }
     ).lean();
 };
 
 /**  
- * @description DAO function to update the status of an incident in the database
- * @param {string} id - The ID of the incident to update
- * @param {string} status - The new status to set for the incident
- * @returns {Object} The updated incident document from the database, or null if not found
+ * @description DAO function to update the status of an incident
  */
-export const updateIncidentStatusDAO = async (id, apiKeyId, status, extraUpdates = {}) => {
+export const updateIncidentStatusDAO = async (id, organizationId, status, extraUpdates = {}) => {
     return await incidentModel.findOneAndUpdate(
-        { _id: id, apiKeyId },
+        { _id: id, organizationId },
         { $set: { status, ...extraUpdates } },
         { returnDocument: "after", runValidators: true }
     ).lean();
+};
+
+/**
+ * Returns counts of active/monitoring incidents for a service to drive status sync.
+ */
+export const getIncidentStatsByServiceDAO = async (serviceName, organizationId) => {
+    const results = await incidentModel.aggregate([
+        { 
+            $match: { 
+                service: serviceName, 
+                organizationId: new mongoose.Types.ObjectId(organizationId),
+                status: { $ne: INCIDENT_STATUS.RESOLVED } 
+            } 
+        },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+
+    const stats = { active: 0, monitoring: 0 };
+    results.forEach(res => {
+        if (res._id === INCIDENT_STATUS.MONITORING) stats.monitoring += res.count;
+        else stats.active += res.count; 
+    });
+    return stats;
 };
 

@@ -80,3 +80,27 @@ export const emitTimelineEvent = (event) => {
     resolveTarget(io, event?.incident?.service).emit("timeline:event", event);
 };
 
+/**
+ * @description Broadcasts a new message or task in the War Room.
+ */
+export const emitWarRoomMessage = (message) => {
+    const io = getIo();
+    if (!io) return;
+
+    const room = message.roomId.trim().toLowerCase();
+    
+    // Broadcast to the specific war room
+    io.to(room).emit(message.type === "task" ? "task:update" : "message:new", message);
+};
+
+/**
+ * @description Specifically broadcasts a task status toggle.
+ */
+export const emitTaskUpdate = (roomId, taskData) => {
+    const io = getIo();
+    if (!io) return;
+
+    io.to(roomId.trim().toLowerCase()).emit("task:update", taskData);
+};
+
+

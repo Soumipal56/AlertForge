@@ -11,6 +11,13 @@ const warRoomMessageSchema = new mongoose.Schema({
         trim: true,
         index: true,
     },
+    organizationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
+    },
+
     // Structured type system
     type: {
         type: String,

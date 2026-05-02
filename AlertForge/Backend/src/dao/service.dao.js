@@ -39,13 +39,18 @@ export const getServiceByIdDAO = async (serviceId, userId) => {
  * @param {string} userId
  * @param {string} status
  */
-export const updateServiceStatusDAO = async (serviceId, userId, status) => {
+export const updateServiceStatusDAO = async (serviceId, userId, status, serviceName = null) => {
+    const filter = { userId };
+    if (serviceId) filter._id = serviceId;
+    if (serviceName) filter.name = serviceName;
+
     return await serviceModel.findOneAndUpdate(
-        { _id: serviceId, userId },
+        filter,
         { $set: { status } },
         { returnDocument: "after", runValidators: true }
     ).lean();
 };
+
 
 /**
  * Updates arbitrary service fields (for PATCH requests).
@@ -70,9 +75,13 @@ export const deleteServiceDAO = async (serviceId, userId) => {
     return await serviceModel.findOneAndDelete({ _id: serviceId, userId });
 };
 
+export const findServiceByNameDAO = async (name, userId) => {
+    return await serviceModel.findOne({ name, userId }).lean();
+};
+
 /**
  * Increments the incident count for a service (called when incident is created).
- * @param {string} serviceId
+ * @param {string} serviceName
  * @param {string} userId
  */
 export const incrementServiceIncidentCountDAO = async (serviceName, userId) => {
@@ -80,5 +89,6 @@ export const incrementServiceIncidentCountDAO = async (serviceName, userId) => {
         { name: serviceName, userId },
         { $inc: { incidentCount: 1 } },
         { returnDocument: "after" }
-    );
+    ).lean();
 };
+

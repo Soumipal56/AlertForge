@@ -4,9 +4,9 @@ export const createWarRoomMessageDAO = async (data) => {
     return await warRoomMessageModel.create(data);
 };
 
-export const getRecentWarRoomMessagesDAO = async (roomId, limit = 50) => {
+export const getRecentWarRoomMessagesDAO = async (roomId, organizationId, limit = 50) => {
     const messages = await warRoomMessageModel
-        .find({ roomId })
+        .find({ roomId, organizationId })
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
@@ -14,12 +14,13 @@ export const getRecentWarRoomMessagesDAO = async (roomId, limit = 50) => {
     return messages.reverse(); // Return in chronological order for UI
 };
 
-export const updateWarRoomTaskStatusDAO = async (messageId, isCompleted) => {
-    return await warRoomMessageModel.findByIdAndUpdate(
-        messageId,
+export const updateWarRoomTaskStatusDAO = async (messageId, organizationId, isCompleted) => {
+    return await warRoomMessageModel.findOneAndUpdate(
+        { _id: messageId, organizationId },
         { $set: { isCompleted } },
         { new: true }
     ).lean();
 };
+
 
 

@@ -83,4 +83,22 @@ export const deleteServiceService = async (serviceId, userId) => {
         throw new ApiError(HTTP_STATUS.NOT_FOUND, "Service not found or already deleted");
     }
     return deleted;
+};/**
+ * ARCHITECTURE HARDENING: Automated status sync based on incident load.
+ */
+import { getIncidentStatsByServiceDAO } from "../dao/incident.dao.js";
+
+export const syncServiceStatusFromIncidentsService = async (serviceName, userId, apiKeyId) => {
+    try {
+        const stats = await getIncidentStatsByServiceDAO(serviceName, apiKeyId);
+        
+        let newStatus = "operational";
+        if (stats.active > 0) newStatus = "outage";
+        else if (stats.monitoring > 0) newStatus = "degraded";
+
+        await updateServiceStatusDAO(null, userId, newStatus, serviceName); 
+        return newStatus;
+    } catch (error) {
+        console.error("[Service Sync] Failed to sync status:", error.message);
+    }
 };

@@ -26,7 +26,7 @@ export const getIncidentTimeline = async (req, res, next) => {
 
         const timeline = await getTimelineEventsByIncidentService(
             id, 
-            req.apiKey._id, 
+            req.user.organizationId, 
             page ? parseInt(page) : 1,
             limit ? parseInt(limit) : 20
         );
@@ -52,13 +52,12 @@ export const addTimelineNote = async (req, res, next) => {
         const timelineEvent = await createTimelineEventService({
             type: TIMELINE_EVENTS.NOTE_ADDED,
             incidentId: id,
-            apiKeyId: req.apiKey._id,
             message,
             metadata: metadata || {},
-            createdBy: req.user?.userId || null,
+            createdBy: req.user?.id || null,
             authorName: req.user?.name || "Responder",
             isPublic: isPublic !== undefined ? isPublic : true,
-        });
+        }, req.user.organizationId);
 
         // Trigger real-time update for timeline note
         emitTimelineEvent({
@@ -72,6 +71,7 @@ export const addTimelineNote = async (req, res, next) => {
         next(error);
     }
 };
+
 
 
 export const createIncident = async (req, res, next) => {
@@ -110,7 +110,7 @@ export const getAllIncidents = async (req, res, next) => {
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid status filter");
         }
 
-        const { incidents, counts } = await getAllIncidentsService(req.apiKey._id, normalizedStatus);
+        const { incidents, counts } = await getAllIncidentsService(req.user.organizationId, normalizedStatus);
 
         return res.json(new ApiResponse(
             HTTP_STATUS.OK,
@@ -129,7 +129,7 @@ export const getAllIncidents = async (req, res, next) => {
 export const getIncidentById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const incident = await getIncidentByIdService(id, req.apiKey._id);
+        const incident = await getIncidentByIdService(id, req.user.organizationId);
 
         if (!incident) {
             throw new ApiError(404, "Incident not found");
@@ -150,7 +150,7 @@ export const updateIncidentStatus = async (req, res, next) => {
         const { status } = req.body;
         const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "";
 
-        const updated = await updateIncidentStatusService(id, req.apiKey._id, normalizedStatus, req.user);
+        const updated = await updateIncidentStatusService(id, req.user.organizationId, req.apiKey._id, normalizedStatus, req.user);
 
         return res.json(new ApiResponse(200, "Incident status updated", updated));
     } catch (error) {
@@ -167,13 +167,14 @@ export const updateIncidentSeverity = async (req, res, next) => {
         const { severity } = req.body;
         const normalizedSeverity = typeof severity === "string" ? severity.trim().toUpperCase() : "";
 
-        const updated = await updateIncidentSeverityService(id, req.apiKey._id, normalizedSeverity, req.user);
+        const updated = await updateIncidentSeverityService(id, req.user.organizationId, req.apiKey._id, normalizedSeverity, req.user);
 
         return res.json(new ApiResponse(200, "Incident severity updated", updated));
     } catch (error) {
         next(error);
     }
 };
+
 
 
 

@@ -17,7 +17,15 @@ const timelineEventSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "Incident",
             required: true,
+            index: true,
         },
+        organizationId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            index: true,
+        },
+
         message: {
             type: String,
             default: "",

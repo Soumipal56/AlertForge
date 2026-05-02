@@ -1,4 +1,14 @@
-import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO, updateIncidentStatusDAO, getIncidentCountsDAO, updateIncidentSeverityDAO } from "../dao/incident.dao.js";
+import mongoose from "mongoose";
+import { 
+    createIncidentDAO, 
+    getAllIncidentsDAO, 
+    getIncidentByIdDAO, 
+    updateIncidentStatusDAO, 
+    getIncidentCountsDAO, 
+    updateIncidentSeverityDAO 
+} from "../dao/incident.dao.js";
+import { incrementServiceIncidentCountDAO } from "../dao/service.dao.js";
+import { syncServiceStatusFromIncidentsService } from "./service.service.js";
 import { fetchTavilyInsights } from "./ai/tavily.service.js";
 import ApiError from "../utils/ApiError.js";
 import { HTTP_STATUS, INCIDENT_STATUS, SEVERITY } from "../config/constants.js";
@@ -11,12 +21,11 @@ import { sendIncidentNotifications } from "./notification/notification.service.j
 /**  
  * @description Service function to retrieve all incidents from the database with status filtering and counts
  */
-export const getAllIncidentsService = async (apiKeyId, status = "all") => {
-    if (!apiKeyId) {
-        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
-    }
-    const incidents = await getAllIncidentsDAO(apiKeyId, status);
-    const aggregation = await getIncidentCountsDAO(apiKeyId);
+export const getAllIncidentsService = async (organizationId, status = "all") => {
+    if (!organizationId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    
+    const incidents = await getAllIncidentsDAO(organizationId, status);
+    const aggregation = await getIncidentCountsDAO(organizationId);
 
     const counts = { all: 0, active: 0, investigating: 0, identified: 0, monitoring: 0, resolved: 0 };
     const validStatuses = Object.keys(counts).filter(k => k !== "all");
@@ -33,63 +42,74 @@ export const getAllIncidentsService = async (apiKeyId, status = "all") => {
     return { incidents, counts };
 };
 
-export const getIncidentByIdService = async (id, apiKeyId) => {
-    if (!apiKeyId) {
-        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
-    }
-    return await getIncidentByIdDAO(id, apiKeyId);
+export const getIncidentByIdService = async (id, organizationId) => {
+    if (!organizationId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    return await getIncidentByIdDAO(id, organizationId);
 };
 
+
 /**  
- * @description Service function to create a new incident with full orchestration
+ * @description Service function to create a new incident with full orchestration and transaction safety
  */
 export const createIncidentService = async (data, user, apiKey) => {
-    // 1. Fetch AI insights
-    const { summary } = await fetchTavilyInsights(data.title || data.message, data.service, data.severity);
-    if (summary) data.realWorldInsights = summary;
+    const session = await mongoose.startSession();
+    let incident;
 
-    // 2. Set defaults
-    data.startedAt = new Date();
-    data.responders = user?.userId ? [user.userId] : [];
-    data.status = data.status || INCIDENT_STATUS.INVESTIGATING;
-    data.severity = data.severity || SEVERITY.P3;
-    data.apiKeyId = apiKey._id;
+    try {
+        await session.withTransaction(async () => {
+            // 1. Fetch AI insights (External, outside transaction if slow, but here we do it before)
+            const { summary } = await fetchTavilyInsights(data.title || data.message, data.service, data.severity);
+            if (summary) data.realWorldInsights = summary;
 
-    // 3. Persist to DB
-    const incident = await createIncidentDAO(data);
+            // 2. Set defaults
+            data.startedAt = new Date();
+            data.responders = user?.id ? [user.id] : [];
+            data.status = data.status || INCIDENT_STATUS.INVESTIGATING;
+            data.severity = data.severity || SEVERITY.P3;
+            data.apiKeyId = apiKey._id;
+            data.organizationId = user.organizationId;
 
-    // 4. SIDE EFFECTS (ORCHESTRATION)
-    // a. Timeline Log
-    await autoLogTimelineEvent({
-        incidentId: incident._id,
-        apiKeyId: apiKey._id,
-        type: TIMELINE_EVENTS.INCIDENT_CREATED,
-        message: `Incident created: ${incident.title}`,
-        user
-    });
 
-    // b. Notifications
-    if (apiKey.user) {
-        sendIncidentNotifications(apiKey.user, incident).catch(console.error);
+            // 3. Persist to DB
+            incident = await createIncidentDAO(data);
+
+            // 4. Update Service Stats
+            await incrementServiceIncidentCountDAO(data.service, user.organizationId);
+
+            // 5. Timeline Log
+            await autoLogTimelineEvent({
+                incidentId: incident._id,
+                apiKeyId: apiKey._id,
+                type: TIMELINE_EVENTS.INCIDENT_CREATED,
+                message: `Incident created: ${incident.title}`,
+                user
+            });
+        });
+    } finally {
+        await session.endSession();
     }
 
-    // c. Sockets
+    // 5. SIDE EFFECTS (Post-commit)
+    if (apiKey.user) sendIncidentNotifications(apiKey.user, incident).catch(console.error);
+    
+    syncServiceStatusFromIncidentsService(incident.service, user.organizationId, apiKey._id).catch(console.error);
+
     emitNewIncident(incident);
     emitTimelineEvent({
         type: TIMELINE_EVENTS.INCIDENT_CREATED,
-        incident: { id: incident._id, title: incident.title, status: incident.status, severity: incident.severity }
+        incident: { id: incident._id, title: incident.title, status: incident.status, severity: incident.severity, service: incident.service }
     });
 
     return incident;
 };
 
 /**  
- * @description Service function to update the status of an incident with full orchestration
+ * @description Service function to update the status of an incident with transaction safety
  */
-export const updateIncidentStatusService = async (id, apiKeyId, status, user) => {
-    if (!apiKeyId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+export const updateIncidentStatusService = async (id, organizationId, apiKeyId, status, user) => {
+    if (!organizationId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
 
-    const incident = await getIncidentByIdDAO(id, apiKeyId);
+    const incident = await getIncidentByIdDAO(id, organizationId);
     if (!incident) throw new ApiError(HTTP_STATUS.NOT_FOUND, "Incident not found");
 
     const currentStatus = incident.status;
@@ -106,25 +126,37 @@ export const updateIncidentStatusService = async (id, apiKeyId, status, user) =>
         throw new ApiError(HTTP_STATUS.BAD_REQUEST, `Invalid status transition: cannot move back to ${status}`);
     }
 
-    const extraUpdates = {};
-    if (status === INCIDENT_STATUS.RESOLVED) extraUpdates.resolvedAt = new Date();
+    const session = await mongoose.startSession();
+    let updated;
 
-    const updated = await updateIncidentStatusDAO(id, apiKeyId, status, extraUpdates);
+    try {
+        await session.withTransaction(async () => {
+            const extraUpdates = {};
+            if (status === INCIDENT_STATUS.RESOLVED) extraUpdates.resolvedAt = new Date();
 
-    // SIDE EFFECTS
-    await autoLogTimelineEvent({
-        incidentId: id,
-        apiKeyId,
-        type: TIMELINE_EVENTS.STATUS_CHANGED,
-        message: `Status changed from ${currentStatus} to ${status}`,
-        metadata: { from: currentStatus, to: status },
-        user
-    });
+            updated = await updateIncidentStatusDAO(id, organizationId, status, extraUpdates);
+
+            // SIDE EFFECTS (Transactional)
+            await autoLogTimelineEvent({
+                incidentId: id,
+                apiKeyId,
+                type: TIMELINE_EVENTS.STATUS_CHANGED,
+                message: `Status changed from ${currentStatus} to ${status}`,
+                metadata: { from: currentStatus, to: status },
+                user
+            });
+        });
+    } finally {
+        await session.endSession();
+    }
+
+    // Post-commit side effects
+    syncServiceStatusFromIncidentsService(updated.service, organizationId, apiKeyId).catch(console.error);
 
     emitIncidentUpdate(updated);
     emitTimelineEvent({
         type: TIMELINE_EVENTS.STATUS_CHANGED,
-        incident: { id: updated._id, title: updated.title, status: updated.status, severity: updated.severity },
+        incident: { id: updated._id, title: updated.title, status: updated.status, severity: updated.severity, service: updated.service },
         metadata: { from: currentStatus, to: status }
     });
 
@@ -138,15 +170,15 @@ export const updateIncidentStatusService = async (id, apiKeyId, status, user) =>
 /**
  * @description Service function to update severity with full orchestration
  */
-export const updateIncidentSeverityService = async (id, apiKeyId, severity, user) => {
-    if (!apiKeyId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+export const updateIncidentSeverityService = async (id, organizationId, apiKeyId, severity, user) => {
+    if (!organizationId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
     if (!Object.values(SEVERITY).includes(severity)) throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid severity");
 
-    const incident = await getIncidentByIdDAO(id, apiKeyId);
+    const incident = await getIncidentByIdDAO(id, organizationId);
     if (!incident) throw new ApiError(HTTP_STATUS.NOT_FOUND, "Incident not found");
 
     const oldSeverity = incident.severity;
-    const updated = await updateIncidentSeverityDAO(id, apiKeyId, severity);
+    const updated = await updateIncidentSeverityDAO(id, organizationId, severity);
 
     // SIDE EFFECTS
     await autoLogTimelineEvent({
@@ -161,11 +193,12 @@ export const updateIncidentSeverityService = async (id, apiKeyId, severity, user
     emitIncidentUpdate(updated);
     emitTimelineEvent({
         type: TIMELINE_EVENTS.SEVERITY_CHANGED,
-        incident: { id: updated._id, title: updated.title, status: updated.status, severity: updated.severity },
+        incident: { id: updated._id, title: updated.title, status: updated.status, severity: updated.severity, service: updated.service },
         metadata: { from: oldSeverity, to: severity }
     });
 
     return updated;
 };
+
 
 

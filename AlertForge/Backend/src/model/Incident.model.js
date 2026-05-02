@@ -62,8 +62,15 @@ const incidentSchema = new mongoose.Schema({
         ref: "ApiKey",
         required: true,
         index: true,
+    },
+    organizationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
     }
 }, {
+
     timestamps: true
 });
 

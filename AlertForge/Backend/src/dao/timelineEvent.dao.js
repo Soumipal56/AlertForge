@@ -16,16 +16,17 @@ export const createTimelineEventDAO = async (data) => {
  * @param {number} limit
  * @returns {Promise<Array>}
  */
-export const getTimelineEventsByIncidentDAO = async (incidentId, page = 1, limit = 20) => {
+export const getTimelineEventsByIncidentDAO = async (incidentId, organizationId, page = 1, limit = 20) => {
     const safeLimit = Math.min(limit || 20, 50);
     const skip = (page - 1) * safeLimit;
 
     return await timelineEventModel
-        .find({ incidentId })
+        .find({ incidentId, organizationId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(safeLimit)
         .lean();
 };
+
 
 

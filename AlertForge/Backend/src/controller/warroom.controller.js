@@ -14,7 +14,7 @@ import { emitWarRoomMessage } from "../services/socket/socket.service.js";
 export const getWarRoomMessages = async (req, res, next) => {
     try {
         const { roomId } = req.params;
-        const messages = await getWarRoomHistoryService(roomId, req.apiKey._id);
+        const messages = await getWarRoomHistoryService(roomId, req.user.organizationId);
         return res.json(new ApiResponse(HTTP_STATUS.OK, "Messages fetched", messages));
     } catch (error) {
         next(error);
@@ -26,7 +26,7 @@ export const getWarRoomMessages = async (req, res, next) => {
  */
 export const sendWarRoomMessage = async (req, res, next) => {
     try {
-        const message = await sendWarRoomMessageService(req.body, req.apiKey._id, req.user);
+        const message = await sendWarRoomMessageService(req.body, req.user.organizationId, req.apiKey._id, req.user);
         
         // Broadcast via Socket.IO
         emitWarRoomMessage(message);
@@ -43,7 +43,7 @@ export const sendWarRoomMessage = async (req, res, next) => {
 export const toggleWarRoomTask = async (req, res, next) => {
     try {
         const { messageId, roomId, isCompleted } = req.body;
-        const updated = await toggleWarRoomTaskService(messageId, roomId, isCompleted, req.apiKey._id, req.user);
+        const updated = await toggleWarRoomTaskService(messageId, roomId, isCompleted, req.user.organizationId, req.apiKey._id, req.user);
         
         // Broadcast update via Socket.IO
         emitWarRoomMessage(updated);
@@ -53,3 +53,4 @@ export const toggleWarRoomTask = async (req, res, next) => {
         next(error);
     }
 };
+

@@ -17,43 +17,49 @@ export const smartAuth = async (req, res, next) => {
             const hashedKey = hashKey(apiKeyHeader);
             const apiKey = await findActiveApiKeyByHashedKeyDAO(hashedKey);
             
-            if (!apiKey) {
-                throw new ApiError(
-                    HTTP_STATUS.UNAUTHORIZED,
-                    ERROR_MESSAGES.AUTH.INVALID_API_KEY
-                );
+            if (!apiKey || !apiKey.user) {
+                throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.INVALID_API_KEY);
             }
 
             req.apiKey = apiKey;
             req.apiKeyId = apiKey._id;
-            req.user = apiKey.user; // important for compatibility
+            req.user = {
+                id: apiKey.user._id,
+                email: apiKey.user.email,
+                role: apiKey.user.role,
+                organizationId: apiKey.user.organizationId || apiKey.user._id,
+                name: apiKey.user.name
+            };
             
-            console.log("Authenticated via API Key:", req.apiKeyId);
             return next();
         }
 
         // CASE 2: NORMAL LOGIN FLOW (Dashboard)
         if (accessToken) {
             const decoded = verifyAccessToken(accessToken);
-
             if (!decoded?.userId) {
-                throw new ApiError(
-                    HTTP_STATUS.UNAUTHORIZED,
-                    ERROR_MESSAGES.AUTH.INVALID_TOKEN
-                );
+                throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.INVALID_TOKEN);
             }
 
-            // attach user info
-            req.user = { userId: decoded.userId };
-
-            // attach API key for internal scoping usage
+            // Fetch full user to get organizationId
             const apiKey = await findActiveApiKeyByUserDAO(decoded.userId);
-            req.apiKey = apiKey;
-            req.apiKeyId = apiKey?._id || null;
+            if (!apiKey || !apiKey.user) {
+                throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User or API Key not found");
+            }
 
-            console.log("Authenticated via Cookie. User:", req.user.userId);
+            req.apiKey = apiKey;
+            req.apiKeyId = apiKey._id;
+            req.user = {
+                id: apiKey.user._id,
+                email: apiKey.user.email,
+                role: apiKey.user.role,
+                organizationId: apiKey.user.organizationId || apiKey.user._id,
+                name: apiKey.user.name
+            };
+
             return next();
         }
+
 
         throw new ApiError(
             HTTP_STATUS.UNAUTHORIZED,
