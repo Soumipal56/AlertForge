@@ -25,6 +25,9 @@ const appConfig = {
     upstashRedisRestUrl: process.env.UPSTASH_REDIS_REST_URL,
     upstashRedisRestToken: process.env.UPSTASH_REDIS_REST_TOKEN,
     redisUrl: process.env.REDIS_URL || null,
+    MistralApiKey: process.env.MISTRAL_API_KEY,
+    MistralModel: process.env.MISTRAL_MODEL,
+    MistralTemperature: process.env.MISTRAL_TEMPERATURE
 };
 
 export default appConfig;

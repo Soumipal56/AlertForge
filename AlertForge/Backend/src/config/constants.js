@@ -32,6 +32,9 @@ export const SUCCESS_MESSAGES = {
 
 export const INCIDENT_STATUS = {
     OPEN: "open",
+    INVESTIGATING: "investigating",
+    IDENTIFIED: "identified",
+    MONITORING: "monitoring",
     RESOLVED: "resolved",
 };
 
