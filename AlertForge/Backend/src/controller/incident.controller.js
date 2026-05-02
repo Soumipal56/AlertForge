@@ -3,7 +3,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, INCIDENT_STATUS } from "../config/constants.js";
-import { sendIncidentNotification } from "../services/notification/notification.service.js";
+import { sendIncidentNotifications } from "../services/notification/notification.service.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
 import { createTimelineEventService } from "../services/timeline/timeline.service.js";
 import { generatePostmortem } from "../services/postmortem.service.js";
@@ -57,8 +57,13 @@ export const createIncident = async (req, res, next) => {
             apiKeyId: req.apiKey._id,
         });
         await saveTimelineEntry("incident.created", incident, incident?.message || "");
-        // Send notification to the user who owns this API key
-        sendIncidentNotification(incident, req.user.userId);
+
+        // Multi-channel notification fan-out
+        const user = req.apiKey.user;
+        if (user) {
+            sendIncidentNotifications(user, incident);
+        }
+
         emitNewIncident(incident);
         emitTimelineEvent({
             type: "incident.created",

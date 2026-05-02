@@ -2,62 +2,100 @@ import { sendIncidentEmail } from "./email.service.js";
 import { sendWhatsApp } from "./whatsapp.service.js";
 import { sendWebhookNotification } from "./webhook.service.js";
 import { sendTelegramNotification } from "./telegram.service.js";
-import User from "../../model/User.model.js";
+
+/**
+ * Sends notifications across all enabled channels (Email, Discord, Telegram)
+ * @param {Object} user - The user document with notification settings
+ * @param {Object} incident - The created incident document
+ */
+export const sendIncidentNotifications = async (user, incident) => {
+    const incidentId = incident._id?.toString() || incident.id;
+    const warRoomLink = `http://localhost:5173/warroom/${incidentId}`;
+    const message = `🚨 Incident Alert\nMessage: ${incident.message}\nService: ${incident.service}\nSeverity: ${incident.severity}\nJoin: ${warRoomLink}`;
+
+    const channels = [];
+
+    // 1. EMAIL LOGIC
+    if (user.notificationSettings?.emailEnabled) {
+        try {
+            const recipientEmails = Array.from(new Set([
+                user.email,
+                user.emailAddress,
+                ...(user.teamEmails || [])
+            ])).filter(Boolean);
+
+            if (recipientEmails.length > 0) {
+                const emailPromises = recipientEmails.map(email => 
+                    sendIncidentEmail({
+                        to: email,
+                        subject: `🚨 AlertForge: ${incident.service} - ${incident.severity.toUpperCase()}`,
+                        message: `
+An incident has been reported.
+
+Message: ${incident.message}
+Service: ${incident.service}
+Severity: ${incident.severity}
+
+Access the War Room here:
+${warRoomLink}
+                        `.trim()
+                    })
+                );
+                channels.push(Promise.allSettled(emailPromises));
+            }
+        } catch (error) {
+            console.error("[Notification] Email Error:", error.message);
+        }
+    }
+
+    // 2. DISCORD LOGIC
+    if (user.notificationSettings?.discordEnabled && user.discordWebhookUrl) {
+        const sendDiscord = async () => {
+            try {
+                const response = await fetch(user.discordWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: message
+                    })
+                });
+                if (!response.ok) throw new Error(`Status ${response.status}`);
+            } catch (error) {
+                console.error("[Notification] Discord Error:", error.message);
+            }
+        };
+        channels.push(sendDiscord());
+    }
+
+    // 3. TELEGRAM LOGIC
+    if (user.notificationSettings?.telegramEnabled && user.telegramChatId) {
+        const sendTelegram = async () => {
+            try {
+                // Using existing telegram service if it handles token, else direct call
+                await sendTelegramNotification(incident, user.telegramChatId, warRoomLink);
+            } catch (error) {
+                console.error("[Notification] Telegram Error:", error.message);
+            }
+        };
+        channels.push(sendTelegram());
+    }
+
+    // 4. WHATSAPP (Backward Compatibility / Extra)
+    if (user.preferences?.whatsappEnabled && user.whatsappNumber) {
+        channels.push(sendWhatsApp({
+            message: `${incident.message}. Join War Room: ${warRoomLink}`,
+            dynamicNumber: user.whatsappNumber
+        }));
+    }
+
+    // Fan-out all channels
+    await Promise.allSettled(channels);
+};
 
 /**  
- * Sends an incident notification to the authenticated user.
- * @param {Object} data - The incident data.
- * @param {string} userId - The MongoDB user ID to notify.
- * @returns {Promise<void>}
+ * Legacy Support / Fallback
  */
 export const sendIncidentNotification = async (data, userId) => {
-    try {
-        // Fetch user notification settings
-        const settings = await User.findById(userId);
-
-        if (!settings) {
-            console.warn(`No notification settings found for user: ${userId}`);
-            // Fallback for demo or if data.to is provided
-            if (data.to) {
-                await sendIncidentEmail({
-                    to: data.to,
-                    subject: "New Incident Created",
-                    message: data.message,
-                });
-            }
-            return;
-        }
-
-        const { preferences, telegramChatId, discordWebhookUrl, emailAddress, whatsappNumber } = settings;
-
-        // 1. Email Notification
-        if (preferences.emailEnabled && (emailAddress || data.to)) {
-            await sendIncidentEmail({
-                to: emailAddress || data.to,
-                subject: `🚨 New Incident: ${data.service}`,
-                message: data.message,
-            });
-        }
-
-        // 2. Telegram Notification
-        if (preferences.telegramEnabled && telegramChatId) {
-            await sendTelegramNotification(data, telegramChatId);
-        }
-
-        // 3. Webhook Notification (Discord/Slack)
-        if (preferences.webhookEnabled && discordWebhookUrl) {
-            await sendWebhookNotification(data, discordWebhookUrl);
-        }
-
-        // 4. WhatsApp Notification
-        if (preferences.whatsappEnabled && whatsappNumber) {
-            await sendWhatsApp({
-                message: data.message,
-                dynamicNumber: whatsappNumber
-            });
-        }
-
-    } catch (error) {
-        console.error("Error sending dynamic incident notification:", error);
-    }
+    // This is now handled by sendIncidentNotifications in createIncident
+    console.warn("sendIncidentNotification is deprecated. Use sendIncidentNotifications instead.");
 };

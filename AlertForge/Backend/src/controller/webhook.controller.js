@@ -1,5 +1,5 @@
 import { createIncidentService } from "../services/incident.service.js";
-import { sendIncidentNotification } from "../services/notification/notification.service.js";
+import { sendIncidentNotifications } from "../services/notification/notification.service.js";
 import { hashKey } from "../utils/hashKey.js";
 import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
 import ApiResponse from "../utils/ApiResponse.js";
@@ -53,7 +53,11 @@ export const uptimerobotWebhook = async (req, res, next) => {
         }
 
         const incident = await createIncidentService(incidentData);
-        sendIncidentNotification(incident, apiKeyDoc.user?._id || apiKeyDoc.user);
+        
+        if (apiKeyDoc.user) {
+            sendIncidentNotifications(apiKeyDoc.user, incident);
+        }
+
         emitNewIncident(incident);
 
         return res.status(HTTP_STATUS.CREATED).json(new ApiResponse(HTTP_STATUS.CREATED, "Alert processed", incident));

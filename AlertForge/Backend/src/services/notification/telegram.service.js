@@ -6,7 +6,7 @@ import appConfig from "../../config/appConfig.js";
  * @param {string} [dynamicChatId] - Optional dynamic chat ID for the recipient.
  * @returns {Promise<void>}
  */
-export const sendTelegramNotification = async (data, dynamicChatId = null) => {
+export const sendTelegramNotification = async (data, dynamicChatId = null, link = null) => {
     const botToken = appConfig.TELEGRAM_BOT_TOKEN;
     const chatId = dynamicChatId || appConfig.TELEGRAM_CHAT_ID;
 
@@ -15,16 +15,20 @@ export const sendTelegramNotification = async (data, dynamicChatId = null) => {
     }
 
     try {
-        const message = `
+        let message = `
 🚨 *New Incident Created*
 
 📌 *Service:* ${data.service || "N/A"}
 ⚡ *Status:* ${data.status || "N/A"}
 🔴 *Severity:* ${data.severity || "N/A"}
 📝 *Message:* ${data.message || "N/A"}
+`.trim();
 
-_AlertForge Incident Management_
-        `.trim();
+        if (link) {
+            message += `\n\n🔗 *Join War Room:* ${link}`;
+        }
+
+        message += `\n\n_AlertForge Incident Management_`;
 
         const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',

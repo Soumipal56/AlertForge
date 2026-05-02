@@ -13,6 +13,17 @@ const userSchema = new mongoose.Schema({
         type: String,
         select: false,
     },
+    name: {
+        type: String,
+        trim: true,
+    },
+    teamEmails: [
+        {
+            type: String,
+            lowercase: true,
+            trim: true,
+        }
+    ],
     telegramChatId: {
         type: String,
         default: null,
@@ -34,6 +45,11 @@ const userSchema = new mongoose.Schema({
         telegramEnabled: { type: Boolean, default: false },
         webhookEnabled: { type: Boolean, default: false },
         whatsappEnabled: { type: Boolean, default: false },
+    },
+    notificationSettings: {
+        emailEnabled: { type: Boolean, default: true },
+        discordEnabled: { type: Boolean, default: false },
+        telegramEnabled: { type: Boolean, default: false }
     }
 }, {
     timestamps: true

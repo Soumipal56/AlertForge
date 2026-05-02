@@ -38,3 +38,45 @@ export const updateUserSettings = async (req, res, next) => {
         next(error);
     }
 };
+/**
+ * @description Update user profile and notification settings
+ */
+export const updateProfile = async (req, res, next) => {
+    try {
+        const { name, teamEmails, discordWebhookUrl, telegramChatId, notificationSettings } = req.body;
+        const userId = req.user.userId;
+
+        // Basic Validation
+        if (teamEmails && Array.isArray(teamEmails)) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!teamEmails.every(email => emailRegex.test(email))) {
+                throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid email format in teamEmails");
+            }
+        }
+
+        if (discordWebhookUrl) {
+            const urlRegex = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//;
+            if (!urlRegex.test(discordWebhookUrl)) {
+                throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid Discord Webhook URL");
+            }
+        }
+
+        const updates = {
+            name,
+            teamEmails,
+            discordWebhookUrl,
+            telegramChatId: telegramChatId?.toString(),
+            notificationSettings
+        };
+
+        const updatedUser = await updateUserByIdDAO(userId, updates);
+
+        if (!updatedUser) {
+            throw new ApiError(HTTP_STATUS.NOT_FOUND, "User not found");
+        }
+
+        return res.json(new ApiResponse(HTTP_STATUS.OK, "Profile updated successfully", updatedUser));
+    } catch (error) {
+        next(error);
+    }
+};
