@@ -220,6 +220,7 @@ function WarRoomChat() {
             const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/upload`, {
                 method: "POST",
                 body: formData,
+                credentials: "include",
             });
 
             const data = await response.json();

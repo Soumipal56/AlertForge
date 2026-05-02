@@ -1,18 +1,33 @@
-import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO,updateIncidentStatusDAO } from "../dao/incident.dao.js";
+import { createIncidentDAO, getAllIncidentsDAO, getIncidentByIdDAO, updateIncidentStatusDAO } from "../dao/incident.dao.js";
+import { fetchTavilyInsights } from "./ai/tavily.service.js";
+import ApiError from "../utils/ApiError.js";
+import { HTTP_STATUS } from "../config/constants.js";
+
 /**  
  * @description Service function to create a new incident by calling the corresponding DAO function
  * @param {Object} data - Incident data containing message, service, severity, etc.
  * @returns {Object} The created incident document from the database
  */
 export const createIncidentService = async (data) => {
+    // Fetch real-world insights asynchronously but await it before saving
+    // If it fails, the service handles the error and returns an empty string
+    const { summary } = await fetchTavilyInsights(data.message, data.service, data.severity);
+    if (summary) {
+        data.realWorldInsights = summary;
+    }
+
     return await createIncidentDAO(data);
 };
 /**  
  * @description Service function to retrieve all incidents from the database
  * @returns {Array} List of incident documents from the database
  */
-export const getAllIncidentsService = async () => {
-    return await getAllIncidentsDAO();
+export const getAllIncidentsService = async (apiKeyId) => {
+    if (!apiKeyId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    }
+
+    return await getAllIncidentsDAO(apiKeyId);
 };
 
 /**  
@@ -20,8 +35,12 @@ export const getAllIncidentsService = async () => {
  * @param {string} id - The ID of the incident to retrieve
  * @returns {Object} The incident document from the database, or null if not found
  */
-export const getIncidentByIdService = async (id) => {
-    return await getIncidentByIdDAO(id);
+export const getIncidentByIdService = async (id, apiKeyId) => {
+    if (!apiKeyId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    }
+
+    return await getIncidentByIdDAO(id, apiKeyId);
 };
 
 /**  
@@ -30,6 +49,10 @@ export const getIncidentByIdService = async (id) => {
  * @param {string} status - The new status to set for the incident
  * @returns {Object} The updated incident document from the database, or null if not found
  */
-export const updateIncidentStatusService = async (id, status) => {
-    return await updateIncidentStatusDAO(id, status);
+export const updateIncidentStatusService = async (id, apiKeyId, status, extraUpdates = {}) => {
+    if (!apiKeyId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
+    }
+
+    return await updateIncidentStatusDAO(id, apiKeyId, status, extraUpdates);
 };

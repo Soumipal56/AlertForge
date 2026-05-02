@@ -21,11 +21,26 @@ const apiKeySchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true,
+    },
+
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
     }
 
 }, {
     timestamps: true
 });
+
+apiKeySchema.index(
+    { user: 1, isActive: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { isActive: true },
+    }
+);
 
 const apiKeyModel = mongoose.model("ApiKey", apiKeySchema);
 

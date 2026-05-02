@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { createIncident, getIncidents, updateIncidentStatus } from "@/services/api";
-import { initializeSocket, reinitializeSocket } from "@/services/socket";
+import { getSocket, initializeSocket, reinitializeSocket, disconnectSocket } from "@/services/socket";
 
 const initialFormState = {
     message: "",
@@ -53,32 +53,34 @@ const upsertIncident = (currentIncidents, incident) => {
 };
 
 function WarRoom() {
+    const navigate = useNavigate();
     const [incidents, setIncidents] = useState([]);
     const [timeline, setTimeline] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [socketStatus, setSocketStatus] = useState("disconnected");
     const [creating, setCreating] = useState(false);
-    const [apiKey, setApiKey] = useState("");
+    const [socketApiKey, setSocketApiKey] = useState("");
+    const [nameInput, setNameInput] = useState("");
     const [form, setForm] = useState(initialFormState);
     const [roomPresence, setRoomPresence] = useState(0);
     const [activeRoom, setActiveRoom] = useState("");
 
     const sortedIncidents = useMemo(() => incidents, [incidents]);
 
+    // Initial load of incidents via REST (session-based)
     useEffect(() => {
-        if (!apiKey.trim()) {
-            setLoading(false);
-            return;
-        }
-
         const fetchData = async () => {
             try {
                 setLoading(true);
                 setError("");
-                const data = await getIncidents(apiKey.trim());
+                const data = await getIncidents();
                 setIncidents(Array.isArray(data) ? data.map(normalizeIncident) : []);
             } catch (fetchError) {
+                if (fetchError?.response?.status === 401) {
+                    navigate("/test-login", { replace: true });
+                    return;
+                }
                 setError(fetchError?.response?.data?.message || fetchError?.message || "Failed to load incidents");
             } finally {
                 setLoading(false);
@@ -86,20 +88,23 @@ function WarRoom() {
         };
 
         fetchData();
-    }, [apiKey]);
+    }, [navigate]);
 
+    // Socket Lifecycle Management
     useEffect(() => {
-        if (!apiKey.trim()) return;
-        reinitializeSocket(apiKey.trim());
-    }, [apiKey]);
+        if (!socketApiKey.trim()) {
+            setSocketStatus("disconnected");
+            setRoomPresence(0);
+            return undefined;
+        }
 
-    useEffect(() => {
-        const socket = initializeSocket(apiKey.trim());
+        const socket = reinitializeSocket(socketApiKey.trim(), nameInput.trim());
 
         const handleConnect = () => {
             setSocketStatus("connected");
+            // Automatically join the service war room if we have an activeRoom selected
             if (activeRoom) {
-                socket.emit("join_room", activeRoom);
+                socket.emit("join_warroom", null);
             }
         };
         const handleDisconnect = () => {
@@ -107,11 +112,10 @@ function WarRoom() {
             setRoomPresence(0);
         };
         const handlePresence = ({ count }) => setRoomPresence(count);
+        
         const handleNewIncident = (incident) => {
             const normalized = normalizeIncident(incident);
-            if (!normalized.id) {
-                return;
-            }
+            if (!normalized.id) return;
 
             setIncidents((current) => upsertIncident(current, normalized));
             setTimeline((current) => [
@@ -124,11 +128,10 @@ function WarRoom() {
                 ...current,
             ]);
         };
+
         const handleIncidentUpdate = (incident) => {
             const normalized = normalizeIncident(incident);
-            if (!normalized.id) {
-                return;
-            }
+            if (!normalized.id) return;
 
             setIncidents((current) => upsertIncident(current, normalized));
             setTimeline((current) => [
@@ -141,6 +144,7 @@ function WarRoom() {
                 ...current,
             ]);
         };
+
         const handleTimelineEvent = (event) => {
             setTimeline((current) => [
                 {
@@ -161,8 +165,7 @@ function WarRoom() {
         socket.on("timeline:event", handleTimelineEvent);
 
         if (socket.connected) {
-            setSocketStatus("connected");
-            if (activeRoom) socket.emit("join_room", activeRoom);
+            handleConnect();
         }
 
         return () => {
@@ -172,8 +175,9 @@ function WarRoom() {
             socket.off("incident:new", handleNewIncident);
             socket.off("incident:update", handleIncidentUpdate);
             socket.off("timeline:event", handleTimelineEvent);
+            disconnectSocket();
         };
-    }, [activeRoom, apiKey]);
+    }, [socketApiKey, nameInput, activeRoom]);
 
     const handleInputChange = (event) => {
         const { name, value } = event.target;
@@ -183,43 +187,27 @@ function WarRoom() {
     const handleServiceChange = (event) => {
         const { value } = event.target;
         setForm((current) => ({ ...current, service: value }));
-
         if (value.trim()) {
-            const room = value.trim().toLowerCase();
-            setActiveRoom(room);
-            if (!apiKey.trim()) {
-                return;
-            }
-            const socket = initializeSocket(apiKey.trim());
-            if (socket.connected) {
-                socket.emit("join_room", room);
-            }
+            setActiveRoom(value.trim().toLowerCase());
         }
     };
 
     const handleCreateIncident = async (event) => {
         event.preventDefault();
-
         try {
             setCreating(true);
             setError("");
-
-            if (!apiKey.trim()) {
-                setError("Add an API key from /api/apikeys first.");
-                return;
-            }
-
-            await createIncident(
-                {
-                    message: form.message,
-                    service: form.service,
-                    severity: form.severity,
-                },
-                apiKey.trim()
-            );
-
+            await createIncident({
+                message: form.message,
+                service: form.service,
+                severity: form.severity,
+            });
             setForm(initialFormState);
         } catch (createError) {
+            if (createError?.response?.status === 401) {
+                navigate("/test-login", { replace: true });
+                return;
+            }
             setError(createError?.response?.data?.message || createError?.message || "Failed to create incident");
         } finally {
             setCreating(false);
@@ -228,13 +216,12 @@ function WarRoom() {
 
     const handleQuickResolve = async (incidentId) => {
         try {
-            if (!apiKey.trim()) {
-                setError("Add an API key from /api/apikeys first.");
+            await updateIncidentStatus(incidentId, "resolved");
+        } catch (statusError) {
+            if (statusError?.response?.status === 401) {
+                navigate("/test-login", { replace: true });
                 return;
             }
-
-            await updateIncidentStatus(incidentId, "resolved", apiKey.trim());
-        } catch (statusError) {
             setError(statusError?.response?.data?.message || statusError?.message || "Failed to update incident");
         }
     };
@@ -245,10 +232,10 @@ function WarRoom() {
                 <div className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
-                            <p className="text-sm uppercase tracking-[0.3em] text-sky-300/80">AlertForge War Room</p>
+                            <p className="text-sm uppercase tracking-[0.3em] text-sky-300/80">AlertForge Dashboard</p>
                             <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Live incident dashboard</h1>
                             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                                Loaded from the backend incidents API and updated instantly through Socket.io events.
+                                Protected by JWT session. Live updates require a valid API Key connection.
                             </p>
                         </div>
                         <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300 sm:grid-cols-4">
@@ -277,9 +264,9 @@ function WarRoom() {
                         <div className="mb-4 flex items-center justify-between">
                             <div>
                                 <h2 className="text-xl font-semibold text-white">Incidents</h2>
-                                <p className="text-sm text-slate-400">New incidents are prepended automatically.</p>
+                                <p className="text-sm text-slate-400">Live events feed from Socket.io</p>
                             </div>
-                            {loading ? <span className="text-xs text-slate-400">Loading...</span> : null}
+                            {loading ? <span className="text-xs text-slate-400 animate-pulse">Loading REST data...</span> : null}
                         </div>
 
                         {error ? (
@@ -291,43 +278,42 @@ function WarRoom() {
                         <div className="space-y-4">
                             {sortedIncidents.length === 0 && !loading ? (
                                 <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-10 text-center text-sm text-slate-400">
-                                    No incidents yet. Create one or trigger the API from Postman.
+                                    No incidents yet.
                                 </div>
                             ) : null}
 
                             {sortedIncidents.map((incident) => (
-                                <article key={incident.id} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                                <article key={incident.id} className="rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:bg-black/40">
                                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                                         <div className="space-y-2">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className={`rounded-full border px-3 py-1 text-xs font-medium ${severityStyles[incident.severity] || severityStyles.medium}`}>
+                                                <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${severityStyles[incident.severity] || severityStyles.medium}`}>
                                                     {incident.severity}
                                                 </span>
-                                                <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusStyles[incident.status] || statusStyles.open}`}>
+                                                <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${statusStyles[incident.status] || statusStyles.open}`}>
                                                     {incident.status}
                                                 </span>
-                                                <span className="text-xs text-slate-500">{incident.id}</span>
+                                                <span className="text-[10px] font-mono text-slate-600">{incident.id}</span>
                                             </div>
                                             <h3 className="text-lg font-medium text-white">{incident.message}</h3>
-                                            <p className="text-sm text-slate-400">Service: {incident.service || "unknown"}</p>
-                                            <p className="text-xs text-slate-500">
-                                                Updated: {incident.updatedAt || incident.createdAt || "just now"}
-                                            </p>
+                                            <p className="text-sm text-slate-400">Affected Service: <span className="text-sky-300">{incident.service || "unknown"}</span></p>
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <Link
                                                 to={`/warroom/${incident.id}`}
                                                 className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-2 text-center text-sm font-medium text-sky-100 transition hover:bg-sky-500/20"
                                             >
-                                                Open War Room
+                                                War Room
                                             </Link>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickResolve(incident.id)}
-                                                className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/20"
-                                            >
-                                                Mark resolved
-                                            </button>
+                                            {incident.status !== "resolved" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickResolve(incident.id)}
+                                                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/20"
+                                                >
+                                                    Resolve
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </article>
@@ -336,26 +322,59 @@ function WarRoom() {
                     </section>
 
                     <aside className="space-y-6">
+                        {/* Socket Authentication Card */}
+                        <section className="rounded-3xl border border-white/10 bg-sky-500/5 p-5 shadow-inner">
+                            <h2 className="text-xl font-semibold text-white">Socket Authentication</h2>
+                            <p className="mt-1 text-sm text-slate-400">Enter your API Key to enable live events and presence tracking.</p>
+                            
+                            <div className="mt-4 space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-xs font-medium text-slate-400">Display Name (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={nameInput}
+                                        onChange={(e) => setNameInput(e.target.value)}
+                                        placeholder="e.g. SRE Dashboard"
+                                        className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-sky-500/50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-xs font-medium text-slate-400">API Key</label>
+                                    <input
+                                        type="password"
+                                        value={socketApiKey}
+                                        onChange={(e) => setSocketApiKey(e.target.value)}
+                                        placeholder="Paste x-api-key"
+                                        className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-sky-500/50"
+                                    />
+                                </div>
+                                {socketStatus === "connected" ? (
+                                    <button 
+                                        onClick={() => setSocketApiKey("")}
+                                        className="w-full rounded-2xl border border-red-500/30 bg-red-500/10 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
+                                    >
+                                        Disconnect Live Feed
+                                    </button>
+                                ) : (
+                                    <p className="text-center text-[10px] text-slate-500 italic">
+                                        Live feed is currently disabled.
+                                    </p>
+                                )}
+                            </div>
+                        </section>
+
                         <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
                             <h2 className="text-xl font-semibold text-white">Create incident</h2>
-                            <p className="mt-1 text-sm text-slate-400">Uses `POST /api/incidents` with your API key.</p>
+                            <p className="mt-1 text-sm text-slate-400">Trigger a new alert across the system.</p>
 
                             <form onSubmit={handleCreateIncident} className="mt-4 space-y-4">
-                                <input
-                                    type="text"
-                                    name="apiKey"
-                                    value={apiKey}
-                                    onChange={(event) => setApiKey(event.target.value)}
-                                    placeholder="x-api-key"
-                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
-                                />
                                 <input
                                     type="text"
                                     name="message"
                                     value={form.message}
                                     onChange={handleInputChange}
                                     placeholder="Incident message"
-                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
                                     required
                                 />
                                 <input
@@ -363,15 +382,15 @@ function WarRoom() {
                                     name="service"
                                     value={form.service}
                                     onChange={handleServiceChange}
-                                    placeholder="Affected service (joins War Room)"
-                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                                    placeholder="Affected service"
+                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
                                     required
                                 />
                                 <select
                                     name="severity"
                                     value={form.severity}
                                     onChange={handleInputChange}
-                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none"
+                                    className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
                                 >
                                     <option value="low">low</option>
                                     <option value="medium">medium</option>
@@ -380,29 +399,29 @@ function WarRoom() {
                                 <button
                                     type="submit"
                                     disabled={creating}
-                                    className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="w-full rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:opacity-50"
                                 >
-                                    {creating ? "Creating..." : "Create incident"}
+                                    {creating ? "Processing..." : "Submit Incident"}
                                 </button>
                             </form>
                         </section>
 
                         <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                            <h2 className="text-xl font-semibold text-white">Timeline</h2>
-                            <p className="mt-1 text-sm text-slate-400">Socket event log for incident activity.</p>
+                            <h2 className="text-xl font-semibold text-white">Activity Log</h2>
+                            <p className="mt-1 text-sm text-slate-400">Real-time socket events.</p>
 
-                            <div className="mt-4 space-y-3">
+                            <div className="mt-4 space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                 {timeline.length === 0 ? (
-                                    <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-slate-400">
-                                        Waiting for live events...
+                                    <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-6 text-sm text-slate-400 italic">
+                                        {socketStatus === "connected" ? "Waiting for events..." : "Connect socket to see activity."}
                                     </div>
                                 ) : null}
 
                                 {timeline.map((item) => (
-                                    <div key={item.id} className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                                        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.label}</div>
-                                        <div className="mt-1 text-sm text-white">{item.text}</div>
-                                        <div className="mt-1 text-xs text-slate-500">{item.at}</div>
+                                    <div key={item.id} className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 animate-in fade-in slide-in-from-top-2">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400">{item.label}</div>
+                                        <div className="mt-1 text-sm text-slate-200">{item.text}</div>
+                                        <div className="mt-1 text-[10px] text-slate-500 font-mono">{new Date(item.at).toLocaleTimeString()}</div>
                                     </div>
                                 ))}
                             </div>

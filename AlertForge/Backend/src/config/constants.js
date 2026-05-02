@@ -20,6 +20,9 @@ export const ERROR_MESSAGES = {
 
     AUTH: {
         INVALID_API_KEY: "Invalid API Key",
+        INVALID_CREDENTIALS: "Invalid email or password",
+        INVALID_TOKEN: "Invalid or expired token",
+        UNAUTHORIZED: "Authentication required",
     }
 };
 
@@ -32,6 +35,9 @@ export const SUCCESS_MESSAGES = {
 
 export const INCIDENT_STATUS = {
     OPEN: "open",
+    INVESTIGATING: "investigating",
+    IDENTIFIED: "identified",
+    MONITORING: "monitoring",
     RESOLVED: "resolved",
 };
 

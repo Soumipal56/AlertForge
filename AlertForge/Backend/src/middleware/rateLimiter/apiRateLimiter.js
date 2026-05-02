@@ -37,8 +37,7 @@ export const authApiLimiter = rateLimit({
     ...rateLimitConfig.api.auth,
     store,
     keyGenerator: (req) => {
-        // Use the API key ID provided by the validation middleware
-        return req.apiKey?.id || req.headers["x-api-key"] || req.ip;
+        return req.apiKey?.id || req.user?.userId || req.ip;
     },
     standardHeaders: true,
     legacyHeaders: false,
