@@ -9,7 +9,9 @@ import {
     removeTeamMemberDAO,
     createUserDAO,
     findUserByEmailDAO,
+    findUserByIdDAO,
 } from "../dao/user.dao.js";
+import { sendInviteEmail } from "../services/notification/email.service.js";
 
 /**
  * GET /api/team/members
@@ -27,7 +29,7 @@ export const getTeamMembers = async (req, res, next) => {
 
 /**
  * POST /api/team/invite
- * Invites a new team member by creating their account linked to the admin's organization.
+ * Invites a new team member. If no password provided, defaults to 'AlertForge123!'.
  * Body: { name, email, password, role }
  */
 export const inviteTeamMember = async (req, res, next) => {
@@ -35,8 +37,8 @@ export const inviteTeamMember = async (req, res, next) => {
         const organizationId = req.user?.userId;
         const { name, email, password, role } = req.body;
 
-        if (!email || !password) {
-            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email and password are required");
+        if (!email) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email is required");
         }
 
         // Check for duplicate email
@@ -48,9 +50,14 @@ export const inviteTeamMember = async (req, res, next) => {
         const validRoles = ["responder", "viewer"];
         const memberRole = validRoles.includes(role) ? role : "responder";
 
-        const hashedPassword = await bcrypt.hash(password, 12);
+        // Default password if not provided
+        const finalPassword = password || "AlertForge123!";
+        // Default name to email prefix if not provided
+        const finalName = name || email.split("@")[0];
+
+        const hashedPassword = await bcrypt.hash(finalPassword, 12);
         const member = await createUserDAO({
-            name,
+            name: finalName,
             email: email.trim().toLowerCase(),
             emailAddress: email.trim().toLowerCase(),
             password: hashedPassword,
@@ -58,19 +65,31 @@ export const inviteTeamMember = async (req, res, next) => {
             organizationId,
         });
 
+        // Fetch inviter's name for a personalized email
+        const inviter = await findUserByIdDAO(organizationId);
+        const inviterName = inviter?.name || "Your Team Lead";
+
+        // Send invitation email asynchronously
+        sendInviteEmail({
+            to: member.email,
+            name: member.name,
+            temporaryPassword: finalPassword,
+            invitedBy: inviterName,
+        }).catch(err => console.error("[InviteEmail] Background error:", err.message));
+
         return res.status(HTTP_STATUS.CREATED).json(
             new ApiResponse(HTTP_STATUS.CREATED, "Team member invited successfully", {
                 id: member._id,
                 email: member.email,
                 role: member.role,
                 name: member.name,
+                temporaryPassword: password ? undefined : "AlertForge123!",
             })
         );
     } catch (error) {
         next(error);
     }
 };
-
 
 /**
  * PATCH /api/team/role
