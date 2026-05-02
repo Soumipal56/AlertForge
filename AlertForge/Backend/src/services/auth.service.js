@@ -124,7 +124,7 @@ export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
             googleId,
             avatar,
             isVerified: true, // Google emails are verified
-            role: "buyer",    // Default role
+            role: "admin",    // Default role
         });
     } catch (error) {
         if (error?.code === 11000) {
