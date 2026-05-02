@@ -26,6 +26,8 @@ export const sendWebhookNotification = async (data, dynamicUrl = null) => {
 
         if (!response.ok) {
             console.error(`Webhook notification failed with status ${response.status}`);
+        } else {
+            console.log(`[Discord/Webhook] Notification sent successfully!`);
         }
     } catch (error) {
         console.error("Error sending webhook notification:", error);

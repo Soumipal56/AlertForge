@@ -39,6 +39,8 @@ _AlertForge Incident Management_
         if (!response.ok) {
             const errorData = await response.json();
             console.error(`Telegram notification failed: ${errorData.description}`);
+        } else {
+            console.log(`[Telegram] Notification sent successfully to: ${chatId}`);
         }
     } catch (error) {
         console.error("Error sending Telegram notification:", error);
