@@ -31,7 +31,7 @@ export const uptimerobotWebhook = async (req, res, next) => {
         if (payload.embeds && payload.embeds.length > 0) {
             const embed = payload.embeds[0];
             const isDown = embed.title.toLowerCase().includes("down");
-            
+
             incidentData = {
                 message: `[Discord Webhook] ${embed.description || embed.title}`,
                 service: "External Monitor",
@@ -39,7 +39,7 @@ export const uptimerobotWebhook = async (req, res, next) => {
                 status: isDown ? "open" : "resolved",
                 apiKeyId: apiKeyDoc._id,
             };
-        } 
+        }
         // 2. Handle Standard UptimeRobot payload
         else {
             const isDown = payload.alertType === "2" || payload.alertType === 2;
