@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const dateLikeSchema = z.union([z.string(), z.date(), z.null()]);
+const dateLikeSchema = z.union([z.string(), z.null()]);
 
 /**
  * Shared schemas for the LangGraph postmortem pipeline.
@@ -40,7 +40,7 @@ export const SimilarIncidentSchema = z.object({
 export const PostmortemActionItemSchema = z.object({
     task: z.string().min(1, "Action item task is required"),
     owner: z.string().min(1, "Action item owner is required"),
-    deadline: z.coerce.date(),
+    deadline: z.string().default(() => new Date().toISOString()),
     status: z.enum(["pending", "done"]),
 }).strict();
 
@@ -78,5 +78,6 @@ export const GraphValidationStateSchema = z.object({
 export const PostmortemGraphInputSchema = z.object({
     incident: IncidentContextSchema,
     timeline: z.array(TimelineEventContextSchema).default([]),
-    similarIncidents: z.array(SimilarIncidentSchema).default([]),
+    chat: z.string().default(""),
+    similarIncidents: z.string().default(""),
 }).strict();

@@ -74,7 +74,7 @@ const formatDate = (value) => {
 const addDays = (dateValue, days) => {
     const nextDate = toDate(dateValue) || new Date();
     nextDate.setDate(nextDate.getDate() + days);
-    return nextDate;
+    return nextDate.toISOString();
 };
 
 const selectTimelineSignals = (timeline = []) =>
@@ -91,10 +91,27 @@ const selectTimelineSignals = (timeline = []) =>
  * This keeps the nodes working with stable, predictable objects.
  */
 export const normalizeGraphInput = (input = {}) => {
+    const safeDateString = (d) => {
+        if (!d) return null;
+        if (typeof d === "string") return d;
+        const dateValue = d instanceof Date ? d : new Date(d);
+        return Number.isNaN(dateValue.getTime()) ? null : dateValue.toISOString();
+    };
+
+    const incidentData = input?.incident || {};
     const parsed = PostmortemGraphInputSchema.parse({
-        incident: input?.incident || {},
-        timeline: Array.isArray(input?.timeline) ? input.timeline : [],
-        similarIncidents: Array.isArray(input?.similarIncidents) ? input.similarIncidents : [],
+        incident: {
+            ...incidentData,
+            createdAt: safeDateString(incidentData.createdAt),
+            updatedAt: safeDateString(incidentData.updatedAt),
+            resolvedAt: safeDateString(incidentData.resolvedAt),
+        },
+        timeline: (Array.isArray(input?.timeline) ? input.timeline : []).map((event) => ({
+            ...event,
+            createdAt: safeDateString(event?.createdAt),
+        })),
+        chat: typeof input?.chat === "string" ? input.chat : "",
+        similarIncidents: typeof input?.similarIncidents === "string" ? input.similarIncidents : "",
     });
 
     return {
@@ -113,14 +130,8 @@ export const normalizeGraphInput = (input = {}) => {
             label: normalizeText(event.label, "Timeline event"),
             message: normalizeText(event.message, "Timeline event recorded"),
         })),
-        similarIncidents: parsed.similarIncidents.map((incident) => ({
-            ...incident,
-            id: normalizeIdentifier(incident.id || incident._id),
-            message: normalizeText(incident.message, "Similar incident"),
-            service: normalizeText(incident.service, "unknown service"),
-            severity: normalizeText(incident.severity, "unknown"),
-            status: normalizeText(incident.status, "unknown"),
-        })),
+        chat: parsed.chat,
+        similarIncidents: parsed.similarIncidents,
     };
 };
 
@@ -249,7 +260,7 @@ export const buildFallbackPostmortem = ({ incident = {}, timeline = [], similarI
     const hasRootCauseNote = timelineSignals.some((event) => event.type === "root_cause.identified");
     const hasFix = timelineSignals.some((event) => event.type === "fix.deployed");
     const hasResponder = timelineSignals.some((event) => event.type === "responder.assigned");
-    const similarCount = similarIncidents.length;
+    const similarCount = similarIncidents && typeof similarIncidents === "string" && similarIncidents.length > 0 ? 1 : 0;
 
     const contributingFactors = [
         impactText ? `Recorded impact: ${impactText}` : "Impact was not explicitly recorded.",

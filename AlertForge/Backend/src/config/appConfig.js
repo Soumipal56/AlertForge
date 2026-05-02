@@ -27,7 +27,12 @@ const appConfig = {
     redisUrl: process.env.REDIS_URL || null,
     MistralApiKey: process.env.MISTRAL_API_KEY,
     MistralModel: process.env.MISTRAL_MODEL,
-    MistralTemperature: process.env.MISTRAL_TEMPERATURE
+    MistralTemperature: process.env.MISTRAL_TEMPERATURE,
+    pinecone: {
+        apiKey: process.env.PINECONE_API_KEY,
+        host: process.env.PINECONE_HOST,
+        index: process.env.PINECONE_INDEX
+    }
 };
 
 export default appConfig;

@@ -1,4 +1,5 @@
 import { createWarRoomMessageDAO, getRecentWarRoomMessagesDAO } from "../../dao/warRoomMessage.dao.js";
+import { storeChatInPinecone } from "../ai/utils/pinecone.js";
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -72,13 +73,20 @@ export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, 
         throw new Error(validation.message);
     }
 
-    return await createWarRoomMessageDAO({
+    const message = await createWarRoomMessageDAO({
         roomId,
         content: validation.value || "",
         fileUrl,
         fileType,
         sender: buildSenderIdentity(apiKey, user),
     });
+
+    // Store asynchronously to avoid blocking the main chat flow
+    storeChatInPinecone(message, roomId).catch(err => {
+        console.error("[ChatService] Failed to store chat in Pinecone:", err);
+    });
+
+    return message;
 };
 
 /**

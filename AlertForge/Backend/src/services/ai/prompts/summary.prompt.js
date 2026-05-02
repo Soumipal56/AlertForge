@@ -1,6 +1,5 @@
 import {
     formatIncidentContext,
-    formatSimilarIncidentContext,
     formatTimelineContext,
 } from "../utils/formatter.js";
 
@@ -21,7 +20,10 @@ export const buildSummaryPrompt = (state) => ({
         "Timeline evidence:",
         formatTimelineContext(state.timeline),
         "",
-        "Similar incidents:",
-        formatSimilarIncidentContext(state.similarIncidents),
+        "War Room Chat:",
+        state.chat,
+        "",
+        "Similar Past Incidents:",
+        state.similarIncidents,
     ].join("\n"),
 });

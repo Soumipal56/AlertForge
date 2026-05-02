@@ -1,6 +1,5 @@
 import {
     formatIncidentContext,
-    formatSimilarIncidentContext,
     formatTimelineContext,
 } from "../utils/formatter.js";
 
@@ -21,8 +20,11 @@ export const buildRootCausePrompt = (state) => ({
         "Timeline evidence:",
         formatTimelineContext(state.timeline),
         "",
-        "Similar incidents:",
-        formatSimilarIncidentContext(state.similarIncidents),
+        "War Room Chat:",
+        state.chat,
+        "",
+        "Similar Past Incidents:",
+        state.similarIncidents,
         "",
         "Use the timeline to identify the strongest evidence for why this happened.",
     ].join("\n"),

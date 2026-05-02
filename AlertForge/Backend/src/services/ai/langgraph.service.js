@@ -23,7 +23,8 @@ import { buildFallbackPostmortem, normalizeGraphInput } from "./utils/formatter.
 const PostmortemGraphState = new StateSchema({
     incident: IncidentContextSchema,
     timeline: z.array(TimelineEventContextSchema).default([]),
-    similarIncidents: z.array(SimilarIncidentSchema).default([]),
+    chat: z.string().default(""),
+    similarIncidents: z.string().default(""),
     summary: z.string().default(""),
     rootCause: z.string().default(""),
     contributingFactors: z.array(z.string()).default([]),

@@ -1,6 +1,5 @@
 import {
     formatIncidentContext,
-    formatSimilarIncidentContext,
     formatTimelineContext,
 } from "../utils/formatter.js";
 
@@ -22,8 +21,11 @@ export const buildActionPrompt = (state) => ({
         "Timeline evidence:",
         formatTimelineContext(state.timeline),
         "",
-        "Similar incidents:",
-        formatSimilarIncidentContext(state.similarIncidents),
+        "War Room Chat:",
+        state.chat,
+        "",
+        "Similar Past Incidents:",
+        state.similarIncidents,
         "",
         "Prefer deadlines spaced across the next 7, 14, and 21 days.",
     ].join("\n"),

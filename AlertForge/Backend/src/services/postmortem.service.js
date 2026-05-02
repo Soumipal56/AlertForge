@@ -3,8 +3,10 @@ import ApiError from "../utils/ApiError.js";
 import incidentModel from "../model/Incident.model.js";
 import timelineEventModel from "../model/TimelineEvent.model.js";
 import postmortemModel from "../model/Postmortem.model.js";
+import warRoomMessageModel from "../model/WarRoomMessage.model.js";
 import { runPostmortemGraph } from "./ai/langgraph.service.js";
-import { buildIncidentSearchRegex, normalizeGraphInput } from "./ai/utils/formatter.js";
+import { normalizeGraphInput } from "./ai/utils/formatter.js";
+import { searchSimilarIncidents, storeIncidentInPinecone, storeChatInPinecone } from "./ai/utils/pinecone.js";
 import { PostmortemOutputSchema } from "./ai/utils/parser.js";
 
 /**
@@ -27,23 +29,25 @@ const loadPostmortemContext = async (incidentId) => {
         throw new ApiError(404, "Incident not found");
     }
 
-    const [timeline, similarIncidents] = await Promise.all([
+    const [timeline, chatMessages] = await Promise.all([
         timelineEventModel.find({ incidentId }).sort({ createdAt: 1 }).lean(),
-        incidentModel.find({
-            _id: { $ne: incident._id },
-            message: buildIncidentSearchRegex(incident.message),
-        })
-            .sort({ createdAt: -1 })
-            .limit(3)
-            .select("message service severity status impact resolvedAt createdAt")
-            .lean(),
+        warRoomMessageModel.find({ roomId: incidentId }).sort({ createdAt: 1 }).lean(),
     ]);
 
-    return normalizeGraphInput({
+    // Format chat messages
+    const chat = chatMessages.map(msg => `${msg.sender?.name || "System"}: ${msg.content}`).join("\n");
+
+    // Get similar incidents from Pinecone (already formatted as string)
+    const similarIncidents = await searchSimilarIncidents(incident);
+
+    const context = normalizeGraphInput({
         incident,
         timeline,
+        chat,
         similarIncidents,
     });
+
+    return { context, chatMessages };
 };
 
 /**
@@ -67,11 +71,21 @@ export const generatePostmortem = async (incidentId) => {
         return existingPostmortem;
     }
 
-    const context = await loadPostmortemContext(incidentId);
+    const { context, chatMessages } = await loadPostmortemContext(incidentId);
     const graphResult = await runPostmortemGraph({
         incident: context.incident,
         timeline: context.timeline,
+        chat: context.chat,
         similarIncidents: context.similarIncidents,
+    });
+
+    // Store the incident and chat in Pinecone asynchronously after postmortem generation
+    // We do not wait for this to finish to avoid blocking the user
+    Promise.all([
+        storeIncidentInPinecone(context.incident),
+        storeChatInPinecone(chatMessages, incidentId)
+    ]).catch(err => {
+        console.error("[Postmortem] Failed to save vectors to Pinecone:", err);
     });
 
     const validatedOutput = PostmortemOutputSchema.safeParse(graphResult);
