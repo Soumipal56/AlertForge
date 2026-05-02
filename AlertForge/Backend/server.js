@@ -77,3 +77,4 @@ if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
     // Standard execution for ESM modules in Node
     startServer();
 }
+
