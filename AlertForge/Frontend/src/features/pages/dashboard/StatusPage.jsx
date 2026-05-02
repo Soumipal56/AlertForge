@@ -108,9 +108,24 @@ const ACTIVE_INCIDENTS = [
     startedAt: "May 20, 2026 11:00 AM",
     duration: "00:42:15",
     updates: [
-      { id: 1, message: "We are investigating reports of elevated latency on the dashboard service.", time: "11:00 AM" },
-      { id: 2, message: "Issue traced to a heavy analytics query running on the primary database. Team is working on isolating it.", time: "11:18 AM" },
-      { id: 3, message: "Mitigation deployed — monitoring response times. Some users may still experience slowness.", time: "11:34 AM" },
+      {
+        id: 1,
+        message:
+          "We are investigating reports of elevated latency on the dashboard service.",
+        time: "11:00 AM",
+      },
+      {
+        id: 2,
+        message:
+          "Issue traced to a heavy analytics query running on the primary database. Team is working on isolating it.",
+        time: "11:18 AM",
+      },
+      {
+        id: 3,
+        message:
+          "Mitigation deployed — monitoring response times. Some users may still experience slowness.",
+        time: "11:34 AM",
+      },
     ],
   },
   {
@@ -122,8 +137,18 @@ const ACTIVE_INCIDENTS = [
     startedAt: "May 20, 2026 09:15 AM",
     duration: "02:27:05",
     updates: [
-      { id: 1, message: "We are seeing elevated response times on the Payments API. Investigation underway.", time: "09:15 AM" },
-      { id: 2, message: "Fix deployed to production. Watching response times stabilize.", time: "10:44 AM" },
+      {
+        id: 1,
+        message:
+          "We are seeing elevated response times on the Payments API. Investigation underway.",
+        time: "09:15 AM",
+      },
+      {
+        id: 2,
+        message:
+          "Fix deployed to production. Watching response times stabilize.",
+        time: "10:44 AM",
+      },
     ],
   },
 ];
@@ -139,9 +164,23 @@ const PAST_INCIDENTS = [
     resolvedAt: "May 19, 2026 09:45 PM",
     duration: "01:05:32",
     updates: [
-      { id: 1, message: "We are investigating reports of file upload failures.", time: "08:40 PM" },
-      { id: 2, message: "Issue identified — S3 bucket policy misconfiguration after an IAM role update.", time: "08:50 PM" },
-      { id: 3, message: "Permissions corrected and deployed. All uploads are now processing normally.", time: "09:45 PM" },
+      {
+        id: 1,
+        message: "We are investigating reports of file upload failures.",
+        time: "08:40 PM",
+      },
+      {
+        id: 2,
+        message:
+          "Issue identified — S3 bucket policy misconfiguration after an IAM role update.",
+        time: "08:50 PM",
+      },
+      {
+        id: 3,
+        message:
+          "Permissions corrected and deployed. All uploads are now processing normally.",
+        time: "09:45 PM",
+      },
     ],
   },
   {
@@ -154,8 +193,18 @@ const PAST_INCIDENTS = [
     resolvedAt: "May 18, 2026 06:05 PM",
     duration: "00:45:10",
     updates: [
-      { id: 1, message: "EU-region users are reporting issues logging in. Investigating.", time: "05:20 PM" },
-      { id: 2, message: "Auth token expiry bug identified and patched. Deployed to production.", time: "06:05 PM" },
+      {
+        id: 1,
+        message:
+          "EU-region users are reporting issues logging in. Investigating.",
+        time: "05:20 PM",
+      },
+      {
+        id: 2,
+        message:
+          "Auth token expiry bug identified and patched. Deployed to production.",
+        time: "06:05 PM",
+      },
     ],
   },
   {
@@ -168,9 +217,22 @@ const PAST_INCIDENTS = [
     resolvedAt: "May 15, 2026 10:44 AM",
     duration: "00:23:41",
     updates: [
-      { id: 1, message: "API is unreachable. Incident declared, team paged.", time: "10:21 AM" },
-      { id: 2, message: "Root cause identified — database connection pool exhausted by unoptimized query in v2.3.1.", time: "10:35 AM" },
-      { id: 3, message: "Deployment v2.3.1 rolled back. All services restored.", time: "10:44 AM" },
+      {
+        id: 1,
+        message: "API is unreachable. Incident declared, team paged.",
+        time: "10:21 AM",
+      },
+      {
+        id: 2,
+        message:
+          "Root cause identified — database connection pool exhausted by unoptimized query in v2.3.1.",
+        time: "10:35 AM",
+      },
+      {
+        id: 3,
+        message: "Deployment v2.3.1 rolled back. All services restored.",
+        time: "10:44 AM",
+      },
     ],
   },
 ];
@@ -249,11 +311,17 @@ function OverallBanner({ services, activeIncidents }) {
   }
 
   return (
-    <div className={`rounded-lg border ${config.bg} px-6 py-5 flex items-center gap-4`}>
+    <div
+      className={`rounded-lg border ${config.bg} px-6 py-5 flex items-center gap-4`}
+    >
       <div className="relative shrink-0">
         <span className="relative flex h-3 w-3">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${config.pulse}`} />
-          <span className={`relative inline-flex rounded-full h-3 w-3 ${config.pulse}`} />
+          <span
+            className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${config.pulse}`}
+          />
+          <span
+            className={`relative inline-flex rounded-full h-3 w-3 ${config.pulse}`}
+          />
         </span>
       </div>
       <div className="flex-1">
@@ -286,7 +354,11 @@ function UptimeBars({ bars }) {
             >
               <div
                 className={`w-full rounded-sm transition-colors duration-100 ${cfg.barColor} ${
-                  status === "operational" ? "h-5" : status === "degraded" ? "h-6" : "h-8"
+                  status === "operational"
+                    ? "h-5"
+                    : status === "degraded"
+                      ? "h-6"
+                      : "h-8"
                 }`}
               />
               {/* Tooltip */}
@@ -294,7 +366,9 @@ function UptimeBars({ bars }) {
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 pointer-events-none">
                   <div className="rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[11px] whitespace-nowrap shadow-xl">
                     <p className="text-zinc-400">{label}</p>
-                    <p className={`font-semibold ${cfg.labelClass}`}>{cfg.label}</p>
+                    <p className={`font-semibold ${cfg.labelClass}`}>
+                      {cfg.label}
+                    </p>
                   </div>
                 </div>
               )}
@@ -317,11 +391,15 @@ function ServiceCard({ service }) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Globe className="size-3.5 text-zinc-600 shrink-0" />
-          <span className="text-sm font-semibold text-zinc-200 truncate">{service.name}</span>
+          <span className="text-sm font-semibold text-zinc-200 truncate">
+            {service.name}
+          </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
-          <span className={`text-xs font-medium ${cfg.labelClass}`}>{cfg.label}</span>
+          <span className={`text-xs font-medium ${cfg.labelClass}`}>
+            {cfg.label}
+          </span>
         </div>
       </div>
 
@@ -340,7 +418,9 @@ function ServiceCard({ service }) {
       {/* Footer */}
       <div className="flex items-center justify-between text-[11px]">
         <span className="text-zinc-700">90 days ago</span>
-        <span className={`font-semibold ${cfg.labelClass}`}>{service.uptime} uptime</span>
+        <span className={`font-semibold ${cfg.labelClass}`}>
+          {service.uptime} uptime
+        </span>
         <span className="text-zinc-700">Today</span>
       </div>
     </div>
@@ -360,15 +440,23 @@ function ActiveIncidentCard({ incident }) {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
           </span>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-zinc-100">{incident.title}</h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">{incident.service}</p>
+            <h3 className="text-sm font-semibold text-zinc-100">
+              {incident.title}
+            </h3>
+            <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
+              {incident.service}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${severityClasses[incident.severity]}`}>
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-bold ${severityClasses[incident.severity]}`}
+          >
             {incident.severity}
           </span>
-          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${incidentStatusClasses[incident.status]}`}>
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${incidentStatusClasses[incident.status]}`}
+          >
             {incident.status}
           </span>
         </div>
@@ -400,7 +488,9 @@ function ActiveIncidentCard({ incident }) {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[11px] text-zinc-600">{u.time}</span>
               </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">{u.message}</p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                {u.message}
+              </p>
             </div>
           </div>
         ))}
@@ -424,17 +514,25 @@ function PastIncidentRow({ incident }) {
         <div className="flex items-center gap-3 min-w-0">
           <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-zinc-300">{incident.title}</p>
-            <p className="text-[11px] text-zinc-600 mt-0.5 font-mono">{incident.service}</p>
+            <p className="text-sm font-medium text-zinc-300">
+              {incident.title}
+            </p>
+            <p className="text-[11px] text-zinc-600 mt-0.5 font-mono">
+              {incident.service}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${severityClasses[incident.severity]}`}>
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-bold ${severityClasses[incident.severity]}`}
+          >
             {incident.severity}
           </span>
           <div className="text-right hidden sm:block">
             <p className="text-[11px] text-zinc-600">{incident.startedAt}</p>
-            <p className="text-[11px] text-zinc-700 font-mono">{incident.duration}</p>
+            <p className="text-[11px] text-zinc-700 font-mono">
+              {incident.duration}
+            </p>
           </div>
           {open ? (
             <ChevronUp className="size-3.5 text-zinc-600" />
@@ -449,7 +547,8 @@ function PastIncidentRow({ incident }) {
           {/* Resolved meta */}
           <div className="flex items-center gap-2 text-[11px] text-zinc-600 mb-1">
             <CheckCircle2 className="size-3 text-emerald-500" />
-            Resolved: {incident.resolvedAt} · Total duration: {incident.duration}
+            Resolved: {incident.resolvedAt} · Total duration:{" "}
+            {incident.duration}
           </div>
           {/* Updates */}
           {incident.updates.map((u, i) => (
@@ -463,8 +562,12 @@ function PastIncidentRow({ incident }) {
                 )}
               </div>
               <div className="pb-1 flex-1 min-w-0">
-                <span className="text-[11px] text-zinc-700 block mb-1">{u.time}</span>
-                <p className="text-xs text-zinc-500 leading-relaxed">{u.message}</p>
+                <span className="text-[11px] text-zinc-700 block mb-1">
+                  {u.time}
+                </span>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  {u.message}
+                </p>
               </div>
             </div>
           ))}
@@ -478,7 +581,8 @@ function PastIncidentRow({ incident }) {
 
 function StatsRow({ services }) {
   const avgUptime =
-    services.reduce((acc, s) => acc + parseFloat(s.uptime), 0) / services.length;
+    services.reduce((acc, s) => acc + parseFloat(s.uptime), 0) /
+    services.length;
 
   const operational = services.filter((s) => s.status === "operational").length;
   const total = services.length;
@@ -502,7 +606,8 @@ function StatsRow({ services }) {
           label: "Active Incidents",
           value: ACTIVE_INCIDENTS.length,
           sub: "being responded to",
-          color: ACTIVE_INCIDENTS.length === 0 ? "text-zinc-400" : "text-red-400",
+          color:
+            ACTIVE_INCIDENTS.length === 0 ? "text-zinc-400" : "text-red-400",
         },
         {
           label: "Incidents This Month",
@@ -511,7 +616,10 @@ function StatsRow({ services }) {
           color: "text-zinc-400",
         },
       ].map(({ label, value, sub, color }) => (
-        <div key={label} className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-4">
+        <div
+          key={label}
+          className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-4"
+        >
           <p className={`text-2xl font-bold font-mono ${color}`}>{value}</p>
           <p className="text-xs font-medium text-zinc-300 mt-1">{label}</p>
           <p className="text-[11px] text-zinc-600 mt-0.5">{sub}</p>
@@ -525,12 +633,11 @@ function StatsRow({ services }) {
 
 export default function StatusPage() {
   const [lastChecked] = useState(
-    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
   );
 
   return (
     <div className="flex flex-col gap-0">
-
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-6">
         <div>
@@ -568,7 +675,9 @@ export default function StatusPage() {
       <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-zinc-300">Services</h2>
-          <span className="text-[11px] text-zinc-600">{SERVICES.length} monitored</span>
+          <span className="text-[11px] text-zinc-600">
+            {SERVICES.length} monitored
+          </span>
         </div>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {SERVICES.map((service) => (
@@ -585,7 +694,9 @@ export default function StatusPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
             </span>
-            <h2 className="text-sm font-semibold text-zinc-300">Active Incidents</h2>
+            <h2 className="text-sm font-semibold text-zinc-300">
+              Active Incidents
+            </h2>
             <span className="rounded-full bg-red-950/60 border border-red-900/50 px-2 py-0.5 text-[10px] font-semibold text-red-300">
               {ACTIVE_INCIDENTS.length}
             </span>
@@ -601,13 +712,17 @@ export default function StatusPage() {
       {/* ── Incident history ───────────────────────────────────────────────── */}
       <div className="mt-6 mb-2">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-zinc-300">Incident History</h2>
+          <h2 className="text-sm font-semibold text-zinc-300">
+            Incident History
+          </h2>
           <span className="text-[11px] text-zinc-600">Past 30 days</span>
         </div>
         {PAST_INCIDENTS.length === 0 ? (
           <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-5 py-8 flex flex-col items-center gap-2">
             <CheckCircle2 className="size-6 text-emerald-500" />
-            <p className="text-sm text-zinc-400">No incidents in the past 30 days</p>
+            <p className="text-sm text-zinc-400">
+              No incidents in the past 30 days
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -617,7 +732,6 @@ export default function StatusPage() {
           </div>
         )}
       </div>
-
     </div>
   );
 }

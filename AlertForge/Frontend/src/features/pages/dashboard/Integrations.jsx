@@ -262,7 +262,7 @@ function SDKSection() {
     >
       <div className="flex flex-col gap-4">
         {/* Tab bar */}
-        <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 -mx-0 flex-wrap">
+        <div className="flex items-center gap-1 border-b border-zinc-800 pb-0 mx-0 flex-wrap">
           {CODE_TABS.map((t) => (
             <button
               key={t.key}
