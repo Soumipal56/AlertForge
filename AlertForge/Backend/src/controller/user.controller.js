@@ -2,6 +2,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { findUserByIdDAO, updateUserByIdDAO } from "../dao/user.dao.js";
+import { updateUserProfileService } from "../services/user.service.js";
 
 /**
  * @description Get notification settings for the authenticated user
@@ -38,51 +39,15 @@ export const updateUserSettings = async (req, res, next) => {
         next(error);
     }
 };
+
 /**
  * @description Update user profile and notification settings
  */
 export const updateProfile = async (req, res, next) => {
     try {
-        const { name, teamEmails, discordWebhookUrl, discordWebhookUrls, telegramChatId, telegramChatIds, notificationSettings } = req.body;
-        const userId = req.user.userId;
-
-        // Basic Validation
-        if (teamEmails && Array.isArray(teamEmails)) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!teamEmails.every(email => emailRegex.test(email))) {
-                throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid email format in teamEmails");
-            }
-        }
-
-        if (discordWebhookUrl) {
-            const urlRegex = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//;
-            if (!urlRegex.test(discordWebhookUrl)) {
-                throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid Discord Webhook URL");
-            }
-        }
-
-        if (discordWebhookUrls && Array.isArray(discordWebhookUrls)) {
-            const urlRegex = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//;
-            if (!discordWebhookUrls.every(url => urlRegex.test(url))) {
-                throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid Discord Webhook URL in discordWebhookUrls");
-            }
-        }
-
-        const updates = {
-            name,
-            teamEmails,
-            discordWebhookUrl,
-            discordWebhookUrls,
-            telegramChatId: telegramChatId?.toString(),
-            telegramChatIds: telegramChatIds?.map(id => id.toString()),
-            notificationSettings
-        };
-
-        const updatedUser = await updateUserByIdDAO(userId, updates);
-
-        if (!updatedUser) {
-            throw new ApiError(HTTP_STATUS.NOT_FOUND, "User not found");
-        }
+        const userId = req.user.id; // Unified ID from smartAuth
+        
+        const updatedUser = await updateUserProfileService(userId, req.body);
 
         return res.json(new ApiResponse(HTTP_STATUS.OK, "Profile updated successfully", updatedUser));
     } catch (error) {

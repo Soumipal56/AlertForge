@@ -6,7 +6,7 @@ import appConfig from "../../config/appConfig.js";
  * @param {string} [dynamicChatId] - Optional dynamic chat ID for the recipient.
  * @returns {Promise<void>}
  */
-export const sendTelegramNotification = async (data, dynamicChatId = null, link = null) => {
+export const sendTelegramNotification = async (data, dynamicChatId = null, link = null, type = "INCIDENT_CREATED") => {
     const botToken = appConfig.TELEGRAM_BOT_TOKEN;
     const chatId = dynamicChatId || appConfig.TELEGRAM_CHAT_ID;
 
@@ -15,13 +15,17 @@ export const sendTelegramNotification = async (data, dynamicChatId = null, link 
     }
 
     try {
+        const titlePrefix = type === "INCIDENT_CREATED" ? "🚨 *New Incident Created*" : 
+                            type === "STATUS_UPDATED" ? "🔄 *Incident Status Update*" : 
+                            "⚠️ *Incident Severity Update*";
+
         let message = `
-🚨 *New Incident Created*
+${titlePrefix}
 
 📌 *Service:* ${data.service || "N/A"}
 ⚡ *Status:* ${data.status || "N/A"}
 🔴 *Severity:* ${data.severity || "N/A"}
-📝 *Message:* ${data.message || "N/A"}
+📝 *Title:* ${data.title || data.message || "N/A"}
 `.trim();
 
         if (link) {
