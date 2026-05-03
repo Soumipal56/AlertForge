@@ -13,9 +13,7 @@ import {
   RefreshCw,
   Radio,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
 import { statusApi } from "@/api/status.api";
-import { normalizeService, normalizeIncident } from "@/lib/mapper";
 
 const serviceStatusConfig = {
   operational: { dot: "bg-emerald-500", label: "Operational", labelClass: "text-emerald-400", barColor: "bg-emerald-700/80 hover:bg-emerald-500" },

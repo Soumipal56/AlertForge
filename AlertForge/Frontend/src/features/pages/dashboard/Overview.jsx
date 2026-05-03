@@ -19,22 +19,37 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SeverityBadge, StatusBadge } from "@/components/shared/Badges";
 import { dropdownContentClass } from "@/constants/styles";
-import { useOverview } from "./useOverview";
+import { useIncidents } from "@/hooks/useIncidents";
+import { useNavigate } from "react-router";
 
 export function Overview() {
   const {
+    filtered,
     tab,
     setTab,
     openCreate,
-    setOpenCreate,
     form,
     handleFormChange,
-    updateRow,
-    handleCreateIncident,
-    filteredRows,
-    formatStartedAt,
-    handleRowClick,
-  } = useOverview();
+    handleCreate,
+    handleUpdateStatus,
+    handleUpdateSeverity,
+    handleOpenCreate,
+    handleCloseCreate,
+  } = useIncidents();
+
+  const formatStartedAt = (date) => {
+    const d = new Date(date);
+    return {
+      date: d.toLocaleDateString(),
+      time: d.toLocaleTimeString(),
+    };
+  };
+
+  const navigate = useNavigate();
+
+  const handleRowClick = (id) => {
+    navigate(`/incidents/${id}`);
+  };
 
   return (
     <>
@@ -49,7 +64,7 @@ export function Overview() {
         <button
           type="button"
           className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-100 transition hover:bg-zinc-800"
-          onClick={() => setOpenCreate(true)}
+          onClick={handleOpenCreate}
         >
           + Create Incident
         </button>
@@ -84,23 +99,23 @@ export function Overview() {
             <span className="sr-only">Open</span>
           </div>
 
-          {filteredRows.map((row) => (
+          {filtered.map((row) => (
             <div
-              key={row.id}
+              key={row._id}
               role="link"
               tabIndex={0}
-              onClick={() => handleRowClick(row.id)}
+              onClick={() => handleRowClick(row._id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  handleRowClick(row.id);
+                  handleRowClick(row._id);
                 }
               }}
               className="grid grid-cols-[2.2fr_1fr_1fr_1.4fr_1fr_auto] gap-3 border-b border-zinc-800 px-0 py-4 text-sm outline-none transition-colors hover:bg-zinc-950/80 focus-visible:bg-zinc-950/80 cursor-pointer"
             >
               <div>
-                <p className="font-medium text-zinc-100">{row.incident}</p>
-                <p className="mt-1 text-xs text-zinc-500">{row.team}</p>
+                <p className="font-medium text-zinc-100">{row.title}</p>
+                <p className="mt-1 text-xs text-zinc-500">{row.service}</p>
               </div>
 
               <div onClick={(e) => e.stopPropagation()}>
@@ -124,7 +139,7 @@ export function Overview() {
                       </DropdownMenuLabel>
                       <DropdownMenuRadioGroup
                         value={row.severity}
-                        onValueChange={(v) => updateRow(row.id, "severity", v)}
+                        onValueChange={(v) => handleUpdateSeverity(row._id, v)}
                       >
                         {[
                           ["P1", "bg-red-700"],
@@ -169,7 +184,7 @@ export function Overview() {
                       </DropdownMenuLabel>
                       <DropdownMenuRadioGroup
                         value={row.status}
-                        onValueChange={(v) => updateRow(row.id, "status", v)}
+                        onValueChange={(v) => handleUpdateStatus(row._id, v)}
                       >
                         {[
                           ["Active", "bg-red-600"],
@@ -216,7 +231,10 @@ export function Overview() {
       </div>
 
       {/* Create Dialog */}
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+      <Dialog
+        open={openCreate}
+        onOpenChange={(v) => (v ? handleOpenCreate() : handleCloseCreate())}
+      >
         <DialogContent className="border border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-zinc-100">Create Incident</DialogTitle>
@@ -224,10 +242,7 @@ export function Overview() {
               Fill in details and create a new incident.
             </DialogDescription>
           </DialogHeader>
-          <form
-            className="mt-4 space-y-4 px-4 pb-4"
-            onSubmit={handleCreateIncident}
-          >
+          <form className="mt-4 space-y-4 px-4 pb-4" onSubmit={handleCreate}>
             <div className="space-y-2">
               <label className="text-sm text-zinc-300">Incident</label>
               <Input

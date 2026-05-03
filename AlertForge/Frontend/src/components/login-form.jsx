@@ -1,50 +1,58 @@
 import { useState } from "react";
-import { useSignIn } from "@clerk/react";
 import { useNavigate } from "react-router";
+import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  loginThunk,
+  clearAuthError,
+  selectAuthLoading,
+  selectAuthError,
+} from "@/store/slices/authSlice";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FcGoogle } from "react-icons/fc";
 
 export function LoginForm({ ...props }) {
-  const { isLoaded, signIn, setActive } = useSignIn();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const loading = useSelector(selectAuthLoading);
+  const reduxError = useSelector(selectAuthError);
+
   const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isLoaded) return;
-    setLoading(true);
-    setError("");
     try {
-      const result = await signIn.create({
-        identifier: form.email,
-        password: form.password,
-      });
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        navigate("/dashboard");
-      }
-    } catch (err) {
-      setError(err.errors?.[0]?.message || "Invalid email or password.");
-    } finally {
-      setLoading(false);
+      await dispatch(
+        loginThunk({ email: form.email, password: form.password }),
+      ).unwrap();
+      navigate("/dashboard");
+    } catch {
+      // error is already in Redux via selectAuthError
     }
   };
 
   const handleGoogleLogin = () => {
-    // Redirect to backend Google OAuth endpoint (custom Passport.js auth)
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
     window.location.href = `${apiUrl}/api/auth/google`;
   };
 
   return (
-    <Card className="bg-neutral-900 border-neutral-700 text-white shadow-xl" {...props}>
+    <Card
+      className="bg-neutral-900 border-neutral-700 text-white shadow-xl"
+      {...props}
+    >
       <CardHeader className="text-center pb-4">
-        <CardTitle className="text-2xl font-bold text-white">Welcome back</CardTitle>
+        <CardTitle className="text-2xl font-bold text-white">
+          Welcome back
+        </CardTitle>
         <CardDescription className="text-neutral-400">
           Enter your credentials to sign in to your account
         </CardDescription>
@@ -52,38 +60,60 @@ export function LoginForm({ ...props }) {
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email" className="text-neutral-300 font-medium">Email</Label>
+            <Label htmlFor="email" className="text-neutral-300 font-medium">
+              Email
+            </Label>
             <Input
-              id="email" type="email" placeholder="m@example.com" required
+              id="email"
+              type="email"
+              placeholder="m@example.com"
+              required
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={(e) => {
+                dispatch(clearAuthError());
+                setForm({ ...form, email: e.target.value });
+              }}
               className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-500 focus:border-neutral-400 focus-visible:ring-0"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="password" className="text-neutral-300 font-medium">Password</Label>
-              <a href="/forgot-password" className="text-xs text-neutral-400 hover:text-white transition-colors">
+              <Label
+                htmlFor="password"
+                className="text-neutral-300 font-medium"
+              >
+                Password
+              </Label>
+              <a
+                href="/forgot-password"
+                className="text-xs text-neutral-400 hover:text-white transition-colors"
+              >
                 Forgot password?
               </a>
             </div>
             <Input
-              id="password" type="password" required
+              id="password"
+              type="password"
+              required
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={(e) => {
+                dispatch(clearAuthError());
+                setForm({ ...form, password: e.target.value });
+              }}
               className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-500 focus:border-neutral-400 focus-visible:ring-0"
             />
           </div>
 
-          {error && (
+          {reduxError && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-              <p className="text-sm text-red-400">{error}</p>
+              <p className="text-sm text-red-400">{reduxError}</p>
             </div>
           )}
 
           <Button
-            type="submit" disabled={loading}
+            type="submit"
+            disabled={loading}
             className="w-full bg-white text-black hover:bg-neutral-200 font-semibold transition-all duration-200"
           >
             {loading ? "Signing in..." : "Sign In"}
@@ -94,12 +124,15 @@ export function LoginForm({ ...props }) {
               <span className="w-full border-t border-neutral-700" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-neutral-900 px-2 text-neutral-500">or continue with</span>
+              <span className="bg-neutral-900 px-2 text-neutral-500">
+                or continue with
+              </span>
             </div>
           </div>
 
           <Button
-            variant="outline" type="button"
+            variant="outline"
+            type="button"
             onClick={handleGoogleLogin}
             className="w-full bg-neutral-800 border-neutral-600 text-white hover:bg-neutral-700 transition-all duration-200"
           >
@@ -109,7 +142,10 @@ export function LoginForm({ ...props }) {
 
           <p className="text-center text-sm text-neutral-500">
             Don't have an account?{" "}
-            <a href="/register" className="text-white underline underline-offset-4 hover:text-neutral-300 transition-colors">
+            <a
+              href="/register"
+              className="text-white underline underline-offset-4 hover:text-neutral-300 transition-colors"
+            >
               Sign up
             </a>
           </p>

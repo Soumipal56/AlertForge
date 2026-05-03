@@ -1,19 +1,26 @@
-import React from 'react';
-import { Navigate } from 'react-router';
-import { useAuth } from '../context/AuthContext';
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router";
+import { selectIsAuthenticated, selectIsFetching } from "@/store/slices/authSlice";
 
 const ProtectedRoute = ({ children }) => {
-    const { user, loading } = useAuth();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isFetching = useSelector(selectIsFetching);
 
-    if (loading) {
-        return <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-white">Loading...</div>;
-    }
+  // Still checking session — show spinner
+  if (isFetching) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300" />
+      </div>
+    );
+  }
 
-    if (!user) {
-        return <Navigate to="/login" replace />;
-    }
+  // Not logged in — redirect to login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
-    return children;
+  return children;
 };
 
 export default ProtectedRoute;

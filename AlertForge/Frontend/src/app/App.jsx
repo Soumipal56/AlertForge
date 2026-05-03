@@ -1,36 +1,33 @@
 import './App.css'
-import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
 import { routes } from "./app.routes";
 import { RouterProvider } from "react-router";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { getMeThunk, selectIsFetching } from "@/store/slices/authSlice";
 
 function App() {
+  const dispatch = useDispatch();
+  const isFetching = useSelector(selectIsFetching);
+
+  useEffect(() => {
+    dispatch(getMeThunk());
+  }, [dispatch]);
+
+
+  if (isFetching) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300" />
+        
+      </div>
+    );
+  }
+
   return (
-    <>
-      {/* <header className="app-header">
-        <div className="header-container">
-          <div className="logo">
-            <span className="logo-text">AlertForge</span>
-          </div>
-          <div className="auth-actions">
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button className="btn btn-secondary">Log in</button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="btn btn-primary">Sign up</button>
-              </SignUpButton>
-            </Show>
-            <Show when="signed-in">
-              <UserButton afterSignOutUrl="/" />
-            </Show>
-          </div>
-        </div>
-      </header> */}
-      <main className="app-content">
-        <RouterProvider router={routes} />
-      </main>
-    </>
-  )
+    <main className="app-content">
+      <RouterProvider router={routes} />
+    </main>
+  );
 }
 
 export default App
