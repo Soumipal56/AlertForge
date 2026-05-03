@@ -13,6 +13,7 @@ import { getIncidentByIdService } from "../services/incident.service.js";
 import { setupRedisAdapter } from "./redis.adapter.js";
 import { socketConnectionLimiter, throttleSocketEvent, rateLimitConfig } from "../middleware/rateLimiter/index.js";
 import { storeChatInPinecone } from "../services/ai/utils/pinecone.js";
+import { getWarRoomSuggestions } from "../services/ai/suggestion.service.js";
 
 let ioInstance = null;
 
@@ -82,6 +83,7 @@ export const initSocket = async (httpServer) => {
 
             // Attach validated user info to the socket
             socket.user = {
+                organizationId: foundKey.user._id?.toString(), // Added for message scoping
                 apiKeyId: foundKey._id?.toString(),
                 userId: foundKey.user?._id?.toString(),
                 organizationId: foundKey.user?.organizationId?.toString() || foundKey.user?._id?.toString(),
@@ -130,7 +132,7 @@ export const initSocket = async (httpServer) => {
                 socket.data.activeRoom = room;
 
                 const count = await addUser(room, socket.id);
-                const recentMessages = await getRecentWarRoomMessages(room);
+                const recentMessages = await getRecentWarRoomMessages(room, socket.user.organizationId);
 
                 // Broadcast presence update
                 ioInstance.to(room).emit("presence:update", { room, count, user: socket.user });
@@ -142,6 +144,17 @@ export const initSocket = async (httpServer) => {
                         count,
                         messages: recentMessages.reverse().map(toMessagePayload),
                     });
+                }
+
+                // AI Suggestions Trigger
+                if (room.startsWith("incident:")) {
+                    const incidentId = room.split(":")[1];
+                    const incident = await getIncidentByIdService(incidentId, socket.user.apiKeyId);
+                    if (incident) {
+                        getWarRoomSuggestions(incident).then(suggestions => {
+                            socket.emit("room:suggestion", { suggestions });
+                        }).catch(err => console.error("[Socket] Suggestion error:", err.message));
+                    }
                 }
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
@@ -166,7 +179,7 @@ export const initSocket = async (httpServer) => {
                 socket.data.activeRoom = room;
 
                 const count = await addUser(room, socket.id);
-                const recentMessages = await getRecentWarRoomMessages(room);
+                const recentMessages = await getRecentWarRoomMessages(room, socket.user.organizationId);
 
                 // Broadcast presence
                 ioInstance.to(room).emit("room:presence", { room, count });
@@ -180,6 +193,11 @@ export const initSocket = async (httpServer) => {
                         status: incident.status,
                     });
                 }
+
+                // AI Suggestions Trigger
+                getWarRoomSuggestions(incident).then(suggestions => {
+                    socket.emit("room:suggestion", { suggestions });
+                }).catch(err => console.error("[Socket] Suggestion error:", err.message));
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
                 emitSocketError(socket, "VALIDATION_ERROR", error.message);

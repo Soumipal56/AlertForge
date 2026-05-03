@@ -13,8 +13,8 @@ import { io } from "socket.io-client";
 const SERVER_URL = "http://localhost:3000";
 
 // Replace this with a real API key from your DB (ApiKey collection)
-const TEST_API_KEY = "your-api-key-here";
-const TEST_NAME = "Test User";
+const TEST_API_KEY = "af_f76a9fdc7f75a03259497466d8d6978511dfff9485150ebca23ed1cc0f85549c";
+const TEST_NAME = "Soumi Pal";
 // ────────────────────────────────────────────────────────────────────────────
 
 const socket = io(SERVER_URL, {
@@ -27,9 +27,8 @@ const socket = io(SERVER_URL, {
 
 socket.on("connect", () => {
     console.log(`✅ Connected as socket: ${socket.id}`);
-    console.log("➡️  Joining war room...");
-
-    socket.emit("join_warroom", {}, (ack) => {
+    console.log("➡️  Joining room...");
+    socket.emit("room:join", { roomType: "service" }, (ack) => {
         if (ack?.success) {
             console.log(`✅ Joined room: "${ack.room}"`);
             console.log(`👥 Online count: ${ack.count}`);

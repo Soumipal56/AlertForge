@@ -57,8 +57,37 @@ const logSettledResults = (channel, targets, results) => {
             return;
         }
 
+<<<<<<< HEAD
+        const webhooks = getUniqueRecipients([
+            user.discordWebhookUrl,
+            ...(user.discordWebhookUrls || [])
+        ]);
+
+        console.log("[Discord] Final webhook list:", webhooks);
+
+        if (webhooks.length === 0) {
+            console.warn("[Discord] Skipped — no webhook URLs found on user");
+            return;
+        }
+
+        const discordPromises = webhooks.map(url =>
+            sendWebhookNotification(incident, url, type)
+        );
+      
+
+        const results = await Promise.allSettled(discordPromises);
+        results.forEach((res, i) => {
+            if (res.status === 'rejected') {
+                console.error(`[Notification] Discord failed for ${webhooks[i]}:`, res.reason);
+            }
+        });
+    } catch (error) {
+        console.error("[Notification] sendDiscordNotifications Error:", error.message);
+    }
+=======
         console.error(`[Notification:${channel}] Failed for ${target}: ${getErrorMessage(result.reason)}`);
     });
+>>>>>>> ef516c450ab1939761a22715691d8617f5abeacc
 };
 
 export const sendEmailNotifications = async (user, payload) => {
