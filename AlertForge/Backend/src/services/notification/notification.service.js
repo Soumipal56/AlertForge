@@ -1,6 +1,7 @@
 import { sendIncidentEmail } from "./email.service.js";
 import { sendWhatsApp } from "./whatsapp.service.js";
 import { sendTelegramNotification } from "./telegram.service.js";
+import { sendWebhookNotification } from "./webhook.service.js";
 
 /**
  * Helper to deduplicate arrays and remove falsy values
@@ -12,7 +13,7 @@ const getUniqueRecipients = (recipients) => {
 /**
  * Sends Email notifications to multiple recipients
  */
-export const sendEmailNotifications = async (user, incident, warRoomLink) => {
+export const sendEmailNotifications = async (user, incident, warRoomLink, type) => {
     try {
         if (!user.notificationSettings?.emailEnabled) return;
 
@@ -24,11 +25,11 @@ export const sendEmailNotifications = async (user, incident, warRoomLink) => {
 
         if (recipients.length === 0) return;
 
-        const emailPromises = recipients.map(email => 
+        const emailPromises = recipients.map(email =>
             sendIncidentEmail({
                 to: email,
-                subject: `🚨 AlertForge: ${incident.service} - ${incident.severity.toUpperCase()}`,
-                message: `An incident has been reported.\n\nMessage: ${incident.message}\nService: ${incident.service}\nSeverity: ${incident.severity}\n\nAccess the War Room here:\n${warRoomLink}`.trim()
+                incident,
+                type,
             })
         );
 
@@ -46,7 +47,7 @@ export const sendEmailNotifications = async (user, incident, warRoomLink) => {
 /**
  * Sends Telegram notifications to multiple chat IDs
  */
-export const sendTelegramNotifications = async (user, incident, warRoomLink) => {
+export const sendTelegramNotifications = async (user, incident, warRoomLink, type) => {
     try {
         if (!user.notificationSettings?.telegramEnabled) return;
 
@@ -57,8 +58,8 @@ export const sendTelegramNotifications = async (user, incident, warRoomLink) => 
 
         if (chatIds.length === 0) return;
 
-        const telegramPromises = chatIds.map(chatId => 
-            sendTelegramNotification(incident, chatId, warRoomLink)
+        const telegramPromises = chatIds.map(chatId =>
+            sendTelegramNotification(incident, chatId, warRoomLink, type)
         );
 
         const results = await Promise.allSettled(telegramPromises);
@@ -75,7 +76,7 @@ export const sendTelegramNotifications = async (user, incident, warRoomLink) => 
 /**
  * Sends Discord notifications to multiple webhook URLs
  */
-export const sendDiscordNotifications = async (user, incident, warRoomLink) => {
+export const sendDiscordNotifications = async (user, incident, warRoomLink, type) => {
     try {
         if (!user.notificationSettings?.discordEnabled) return;
 
@@ -86,16 +87,8 @@ export const sendDiscordNotifications = async (user, incident, warRoomLink) => {
 
         if (webhooks.length === 0) return;
 
-        const message = `🚨 Incident Alert\nMessage: ${incident.message}\nService: ${incident.service}\nSeverity: ${incident.severity}\nJoin: ${warRoomLink}`;
-
-        const discordPromises = webhooks.map(url => 
-            fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: message })
-            }).then(res => {
-                if (!res.ok) throw new Error(`Status ${res.status}`);
-            })
+        const discordPromises = webhooks.map(url =>
+            sendWebhookNotification(incident, url, type)
         );
 
         const results = await Promise.allSettled(discordPromises);
@@ -112,26 +105,31 @@ export const sendDiscordNotifications = async (user, incident, warRoomLink) => {
 /**
  * Main fan-out function for all incident notifications
  */
-export const sendIncidentNotifications = async (user, incident) => {
+export const sendIncidentNotifications = async (user, incident, type = "INCIDENT_CREATED") => {
     const incidentId = incident._id?.toString() || incident.id;
     const warRoomLink = `http://localhost:5173/warroom/${incidentId}`;
 
     // Execute all channels in parallel
     await Promise.allSettled([
-        sendEmailNotifications(user, incident, warRoomLink),
-        sendTelegramNotifications(user, incident, warRoomLink),
-        sendDiscordNotifications(user, incident, warRoomLink),
+        sendEmailNotifications(user, incident, warRoomLink, type),
+        sendTelegramNotifications(user, incident, warRoomLink, type),
+        sendDiscordNotifications(user, incident, warRoomLink, type),
         // Optional Whatsapp legacy
         user.preferences?.whatsappEnabled && user.whatsappNumber ? sendWhatsApp({
-            message: `${incident.message}. Join War Room: ${warRoomLink}`,
+            message: `${incident.message || incident.title}. Join War Room: ${warRoomLink}`,
             dynamicNumber: user.whatsappNumber
         }) : Promise.resolve()
     ]);
 };
 
-/**  
- * Legacy Support / Fallback
+/**
+ * Clean wrapper conforming to the new signature
+ * @param {Object} params - { incident, user, type }
  */
-export const sendIncidentNotification = async (data, userId) => {
-    console.warn("sendIncidentNotification is deprecated. Use sendIncidentNotifications instead.");
+export const sendIncidentNotification = async ({ incident, user, type }) => {
+    if (!user) {
+        console.warn("[NotificationService] No user provided. Skipping.");
+        return;
+    }
+    await sendIncidentNotifications(user, incident, type);
 };
