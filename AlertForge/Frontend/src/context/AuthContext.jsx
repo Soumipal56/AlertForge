@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/testApi';
+import { authApi } from '@/api/auth.api';
 
 const AuthContext = createContext();
 
@@ -9,11 +9,12 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUser = async () => {
         try {
-            const response = await api.get('/api/auth/me');
-            setUser(response.data.data);
+            const data = await authApi.me();
+            setUser(data);
         } catch (error) {
-            console.error("Failed to fetch user:", error);
+            console.error("[AuthContext] Failed to fetch user:", error);
             setUser(null);
+            // Don't clear token here, wait for 401 interceptor if it's truly expired
         } finally {
             setLoading(false);
         }
@@ -21,15 +22,24 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
-            await api.post('/api/auth/logout');
+            await authApi.logout();
+            localStorage.removeItem("alertforge.accessToken");
             setUser(null);
         } catch (error) {
-            console.error("Logout failed:", error);
+            console.error("[AuthContext] Logout failed:", error);
         }
     };
 
     useEffect(() => {
         fetchUser();
+
+        // Listen for auth-expired event from apiClient
+        const handleAuthExpired = () => {
+            setUser(null);
+            localStorage.removeItem("alertforge.accessToken");
+        };
+        window.addEventListener("alertforge:auth-expired", handleAuthExpired);
+        return () => window.removeEventListener("alertforge:auth-expired", handleAuthExpired);
     }, []);
 
     return (

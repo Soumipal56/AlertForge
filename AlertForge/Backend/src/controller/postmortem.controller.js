@@ -1,7 +1,7 @@
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { HTTP_STATUS } from "../config/constants.js";
-import { generatePostmortem, getPostmortemByIncidentIdService, updatePostmortemService } from "../services/postmortem.service.js";
+import { generatePostmortem, getPostmortemByIncidentIdService, updatePostmortemService, exportPostmortemService } from "../services/postmortem.service.js";
 
 
 /**
@@ -74,6 +74,24 @@ export const updatePostmortemController = async (req, res, next) => {
         return res.json(
             new ApiResponse(HTTP_STATUS.OK, "Postmortem updated", postmortem)
         );
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/postmortem/:incidentId/export
+ */
+export const exportPostmortem = async (req, res, next) => {
+    try {
+        const { incidentId } = req.params;
+        const apiKeyId = req.apiKey?._id || req.user?._id;
+
+        const { filename, content } = await exportPostmortemService(incidentId, apiKeyId);
+        
+        res.setHeader("Content-Type", "text/markdown");
+        res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+        return res.send(content);
     } catch (error) {
         next(error);
     }
