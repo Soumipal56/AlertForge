@@ -69,7 +69,7 @@ app.use(`/api/warroom`, warRoomRouter)
 app.use(errorHandler);
 
 // Catch-all route for SPA - serves the frontend for any non-API routes
-app.get("*", (req, res, next) => {
+app.get("*any", (req, res, next) => {
     if (req.url.startsWith("/api") || req.url.startsWith("/socket.io")) {
         return next();
     }
