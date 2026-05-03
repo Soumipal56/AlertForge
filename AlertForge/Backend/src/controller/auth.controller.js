@@ -117,7 +117,7 @@ export const googleLogin = (req, res, next) => {
 // Get current authenticated user
 export const getMe = async (req, res, next) => {
     try {
-        const user = await findUserByIdDAO(req.user.userId);
+        const user = await findUserByIdDAO(req.user.id);
         if (!user) {
             return res.status(HTTP_STATUS.NOT_FOUND).json(
                 new ApiResponse(HTTP_STATUS.NOT_FOUND, "User not found")

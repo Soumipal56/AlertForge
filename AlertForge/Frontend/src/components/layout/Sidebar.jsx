@@ -1,9 +1,6 @@
-// src/components/layout/Sidebar.jsx
-// Dependencies needed:
-// npx shadcn@latest add sidebar dropdown-menu avatar separator skeleton
-
 import { NavLink, useLocation, useNavigate } from "react-router";
-import { useUser, useClerk } from "@clerk/react";
+import { useDispatch, useSelector } from "react-redux";
+import {  selectUser } from "@/store/slices/authSlice"; 
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -44,68 +41,38 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// ─── Nav config ──────────────────────────────────────────────────────────────
-// Set badge to a number > 0 to show it. Wire up real counts from Redux later.
-
 const mainNav = [
-  {
-    label: "Overview",
-    icon: LayoutDashboard,
-    to: "/dashboard",
-    end: true,
-  },
+  { label: "Overview", icon: LayoutDashboard, to: "/dashboard", end: true },
   {
     label: "Incidents",
     icon: AlertTriangle,
     to: "/dashboard/incidents",
-    badge: 3, // 🔴 replace with live count from store
+    badge: 3,
   },
-  {
-    label: "War Room",
-    icon: Swords,
-    to: "/dashboard/war-room",
-  },
-  {
-    label: "Postmortem",
-    icon: ScrollText,
-    to: "/dashboard/postmortem",
-  },
+  { label: "War Room", icon: Swords, to: "/dashboard/war-room" },
+  { label: "Postmortem", icon: ScrollText, to: "/dashboard/postmortem" },
 ];
 
 const infraNav = [
-  {
-    label: "Services",
-    icon: Server,
-    to: "/dashboard/services",
-  },
+  { label: "Services", icon: Server, to: "/dashboard/services" },
   {
     label: "Integrations & API Keys",
     icon: Plug,
     to: "/dashboard/integrations",
   },
-  {
-    label: "Status Page",
-    icon: Globe,
-    to: "/dashboard/status",
-  },
+  { label: "Status Page", icon: Globe, to: "/dashboard/status" },
 ];
 
-const workspaceNav = [
-  {
-    label: "Team",
-    icon: Users,
-    to: "/dashboard/team",
-  },
-];
-
-// ─── Reusable nav group ───────────────────────────────────────────────────────
+const workspaceNav = [{ label: "Team", icon: Users, to: "/dashboard/team" }];
 
 function NavGroup({ label, items }) {
   const location = useLocation();
 
   return (
     <SidebarGroup>
-      {label && <SidebarGroupLabel className="text-white/60">{label}</SidebarGroupLabel>}
+      {label && (
+        <SidebarGroupLabel className="text-white/60">{label}</SidebarGroupLabel>
+      )}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
@@ -141,24 +108,25 @@ function NavGroup({ label, items }) {
   );
 }
 
-// ─── User footer ──────────────────────────────────────────────────────────────
-
 function UserFooter() {
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const user = useSelector(selectUser);
 
   if (!user) return null;
 
-  const initials = [user.firstName, user.lastName]
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase() ||
-    user.emailAddresses[0]?.emailAddress[0].toUpperCase();
+  // Build initials from name, fallback to first letter of email
+  const initials = user.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : (user.email?.[0]?.toUpperCase() ?? "U");
 
   const handleSignOut = async () => {
-    await signOut();
+    await dispatch(logoutThunk());
     navigate("/login");
   };
 
@@ -173,7 +141,7 @@ function UserFooter() {
                 className="text-white hover:bg-white/10 hover:text-white data-[state=open]:bg-white/10 data-[state=open]:text-white"
               >
                 <Avatar className="h-8 w-8 rounded-lg shrink-0">
-                  <AvatarImage src={user.imageUrl} alt={user.fullName} />
+                  <AvatarImage src={user.avatarUrl} alt={user.name} />
                   <AvatarFallback className="rounded-lg bg-white/15 text-white text-xs font-bold">
                     {initials}
                   </AvatarFallback>
@@ -181,10 +149,10 @@ function UserFooter() {
 
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
-                    {user.fullName || "User"}
+                    {user.name || "User"}
                   </span>
                   <span className="truncate text-xs text-white/70">
-                    {user.emailAddresses[0]?.emailAddress}
+                    {user.email}
                   </span>
                 </div>
 
@@ -198,19 +166,16 @@ function UserFooter() {
               align="end"
               sideOffset={4}
             >
-              {/* User info */}
               <div className="flex items-center gap-2 px-2 py-2">
                 <Avatar className="h-8 w-8 rounded-lg shrink-0">
-                  <AvatarImage src={user.imageUrl} alt={user.fullName} />
+                  <AvatarImage src={user.avatarUrl} alt={user.name} />
                   <AvatarFallback className="rounded-lg bg-white/15 text-white text-xs font-bold">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid text-sm leading-tight">
-                  <span className="font-semibold">{user.fullName}</span>
-                  <span className="text-xs text-white/70">
-                    {user.emailAddresses[0]?.emailAddress}
-                  </span>
+                  <span className="font-semibold">{user.name}</span>
+                  <span className="text-xs text-white/70">{user.email}</span>
                 </div>
               </div>
 
@@ -231,13 +196,9 @@ function UserFooter() {
   );
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
-
 export function AppSidebar({ ...props }) {
   return (
     <Sidebar collapsible="icon" className="border-r border-white/10" {...props}>
-
-      {/* Brand */}
       <SidebarHeader className="bg-black text-white">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -265,7 +226,6 @@ export function AppSidebar({ ...props }) {
         </SidebarMenu>
       </SidebarHeader>
 
-      {/* Nav */}
       <SidebarContent className="bg-black text-white">
         <NavGroup items={mainNav} />
         <SidebarSeparator />
@@ -274,10 +234,7 @@ export function AppSidebar({ ...props }) {
         <NavGroup label="Workspace" items={workspaceNav} />
       </SidebarContent>
 
-      {/* User */}
       <UserFooter />
-
-      {/* Click rail to collapse/expand */}
       <SidebarRail />
     </Sidebar>
   );

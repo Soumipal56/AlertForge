@@ -1,13 +1,8 @@
 import { DropdownNavigation } from "@/components/ui/dorpdown-navigation";
 import { Zap, Menu, X } from "lucide-react";
 import { useState } from "react";
-import {
-  SignInButton,
-  SignUpButton,
-  UserButton,
-  Show,
-  useUser,
-} from "@clerk/react";
+import { useNavigate } from "react-router";
+import { useSelector } from "react-redux";
 import {
   Cpu,
   Globe,
@@ -21,7 +16,6 @@ import {
   FileText,
   Newspaper,
 } from "lucide-react";
-import { useNavigate } from "react-router";
 
 function Navbar() {
   const NAV_ITEMS = [
@@ -195,9 +189,12 @@ function Navbar() {
     },
     { id: 5, label: "Docs", link: "#" },
   ];
+
   const [menuOpen, setMenuOpen] = useState(false);
-  const { isSignedIn } = useUser();
   const navigate = useNavigate();
+
+  // TODO: update this selector to match your Redux auth slice shape
+  const isSignedIn = useSelector((state) => state.auth.isAuthenticated);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 md:px-10 lg:px-16 py-4">
@@ -220,24 +217,30 @@ function Navbar() {
         {/* RIGHT — Auth buttons */}
         <div className="hidden md:flex items-center gap-2 shrink-0">
           {isSignedIn ? (
-            <div className="bg-zinc-800/50 p-1 rounded-full border border-white/5 shadow-inner">
-              <UserButton afterSignOutUrl="/" />
-            </div>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="text-sm px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 transition-all duration-200 font-semibold cursor-pointer"
+            >
+              Dashboard
+            </button>
           ) : (
             <>
-              <SignInButton mode="modal">
-                <button className="text-zinc-400 hover:text-white text-sm px-4 py-2 rounded-xl hover:bg-white/6 transition-all duration-200 font-medium cursor-pointer">
-                  Log in
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="text-sm px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 transition-all duration-200 font-semibold cursor-pointer shadow-lg shadow-white/5">
-                  Sign up
-                </button>
-              </SignUpButton>
+              <button
+                onClick={() => navigate("/login")}
+                className="text-zinc-400 hover:text-white text-sm px-4 py-2 rounded-xl hover:bg-white/6 transition-all duration-200 font-medium cursor-pointer"
+              >
+                Log in
+              </button>
+              <button
+                onClick={() => navigate("/register")}
+                className="text-sm px-4 py-2 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 transition-all duration-200 font-semibold cursor-pointer"
+              >
+                Sign up
+              </button>
             </>
           )}
         </div>
+
         <button
           className="md:hidden text-zinc-400 hover:text-white transition-colors p-1"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -245,6 +248,8 @@ function Navbar() {
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
+
+      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden max-w-7xl mx-auto mt-2 bg-zinc-950/95 border border-zinc-800/60 backdrop-blur-xl rounded-2xl px-5 py-4 flex flex-col gap-1">
           {[
@@ -258,28 +263,42 @@ function Navbar() {
             <a
               key={link}
               href="#"
-              className="text-zinc-400 hover:text-white text-sm px-3 py-2.5 rounded-lg hover:bg-white/[6 transition-all duration-200"
+              className="text-zinc-400 hover:text-white text-sm px-3 py-2.5 rounded-lg hover:bg-white/6 transition-all duration-200"
             >
               {link}
             </a>
           ))}
           <div className="border-t border-zinc-800 mt-2 pt-3 flex flex-col gap-2">
             {isSignedIn ? (
-              <div className="px-3 py-2">
-                <UserButton afterSignOutUrl="/" />
-              </div>
+              <button
+                onClick={() => {
+                  navigate("/dashboard");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-center text-sm px-3 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold cursor-pointer"
+              >
+                Dashboard
+              </button>
             ) : (
               <>
-                <SignInButton mode="modal">
-                  <button className="w-full text-left text-zinc-300 text-sm px-3 py-2.5 rounded-lg hover:bg-white/6 transition-all duration-200 font-medium cursor-pointer">
-                    Log in
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="w-full text-center text-sm px-3 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold cursor-pointer">
-                    Sign up
-                  </button>
-                </SignUpButton>
+                <button
+                  onClick={() => {
+                    navigate("/login");
+                    setMenuOpen(false);
+                  }}
+                  className="w-full text-left text-zinc-300 text-sm px-3 py-2.5 rounded-lg hover:bg-white/6 transition-all duration-200 font-medium cursor-pointer"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("/register");
+                    setMenuOpen(false);
+                  }}
+                  className="w-full text-center text-sm px-3 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold cursor-pointer"
+                >
+                  Sign up
+                </button>
               </>
             )}
           </div>

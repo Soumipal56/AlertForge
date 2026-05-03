@@ -4,79 +4,18 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Globe, Clock, CalendarDays, ArrowRight, Radio } from "lucide-react";
 import {
-  Globe,
-  Clock,
-  CalendarDays,
-  ArrowRight,
-  Radio,
-} from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const initialIncidents = [
-  {
-    id: 1,
-    title: "API Service Down",
-    service: "api.acme.com",
-    severity: "P1",
-    status: "Active",
-    startedAt: "May 20, 2026 10:21 AM",
-    duration: "00:23:41",
-    responders: ["MU", "AL", "SA"],
-    lastUpdate: "Investigating high error rate on /api/payments endpoint — possible DB timeout",
-    updatedAgo: "2 mins ago",
-  },
-  {
-    id: 2,
-    title: "Payments Slower than Usual",
-    service: "payments.acme.com",
-    severity: "P2",
-    status: "Monitoring",
-    startedAt: "May 20, 2026 09:15 AM",
-    duration: "01:29:12",
-    responders: ["AL", "ZA"],
-    lastUpdate: "Fix deployed, watching response times stabilize over next 15 minutes",
-    updatedAgo: "8 mins ago",
-  },
-  {
-    id: 3,
-    title: "File Upload Failing",
-    service: "uploads.acme.com",
-    severity: "P3",
-    status: "Resolved",
-    startedAt: "May 19, 2026 08:40 PM",
-    duration: "01:05:32",
-    responders: ["MU"],
-    lastUpdate: "S3 bucket permissions corrected, all uploads restored successfully",
-    updatedAgo: "1 hr ago",
-  },
-  {
-    id: 4,
-    title: "Login Issues for EU Users",
-    service: "auth.acme.com",
-    severity: "P3",
-    status: "Resolved",
-    startedAt: "May 18, 2026 05:20 PM",
-    duration: "00:45:10",
-    responders: ["SA", "AL"],
-    lastUpdate: "Auth token expiry bug patched and deployed to production",
-    updatedAgo: "1 day ago",
-  },
-  {
-    id: 5,
-    title: "Dashboard Latency Spike",
-    service: "dashboard.acme.com",
-    severity: "P2",
-    status: "Investigating",
-    startedAt: "May 20, 2026 11:00 AM",
-    duration: "00:10:05",
-    responders: ["ZA", "MU", "AL"],
-    lastUpdate: "Traced to heavy analytics query running on main DB — team working on isolating it",
-    updatedAgo: "Just now",
-  },
-];
+const initialIncidents = [];
 
 // ─── Style maps ───────────────────────────────────────────────────────────────
 
@@ -140,10 +79,14 @@ function IncidentCard({ incident }) {
           </h3>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${severityClasses[incident.severity]}`}>
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${severityClasses[incident.severity]}`}
+          >
             {incident.severity}
           </span>
-          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusClasses[incident.status]}`}>
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusClasses[incident.status]}`}
+          >
             {incident.status}
           </span>
         </div>
@@ -164,7 +107,9 @@ function IncidentCard({ incident }) {
         <span className="flex items-center gap-1.5">
           <Clock className="size-3 shrink-0" />
           {isActive ? (
-            <span className="text-orange-400 font-mono">{incident.duration}</span>
+            <span className="text-orange-400 font-mono">
+              {incident.duration}
+            </span>
           ) : (
             <span className="font-mono">{incident.duration}</span>
           )}
@@ -196,7 +141,9 @@ function IncidentCard({ incident }) {
           <p className="text-xs text-zinc-500 italic truncate">
             "{incident.lastUpdate}"
           </p>
-          <p className="text-[11px] text-zinc-700 mt-0.5">{incident.updatedAgo}</p>
+          <p className="text-[11px] text-zinc-700 mt-0.5">
+            {incident.updatedAgo}
+          </p>
         </div>
       </div>
 
@@ -250,25 +197,38 @@ export default function Incidents() {
       },
       ...prev,
     ]);
-    setForm({ title: "", service: "", severity: "P2", status: "Active", startedAt: "", duration: "" });
+    setForm({
+      title: "",
+      service: "",
+      severity: "P2",
+      status: "Active",
+      startedAt: "",
+      duration: "",
+    });
     setOpenCreate(false);
   };
 
   const filtered = useMemo(() => {
     let result = incidents;
-    if (tab !== "all") result = result.filter((i) => i.status.toLowerCase() === tab);
-    if (search.trim()) result = result.filter((i) =>
-      i.title.toLowerCase().includes(search.toLowerCase()) ||
-      i.service.toLowerCase().includes(search.toLowerCase())
-    );
+    if (tab !== "all")
+      result = result.filter((i) => i.status.toLowerCase() === tab);
+    if (search.trim())
+      result = result.filter(
+        (i) =>
+          i.title.toLowerCase().includes(search.toLowerCase()) ||
+          i.service.toLowerCase().includes(search.toLowerCase()),
+      );
     return result;
   }, [incidents, tab, search]);
 
-  const counts = useMemo(() => ({
-    active: incidents.filter((i) => i.status === "Active").length,
-    monitoring: incidents.filter((i) => i.status === "Monitoring").length,
-    resolved: incidents.filter((i) => i.status === "Resolved").length,
-  }), [incidents]);
+  const counts = useMemo(
+    () => ({
+      active: incidents.filter((i) => i.status === "Active").length,
+      monitoring: incidents.filter((i) => i.status === "Monitoring").length,
+      resolved: incidents.filter((i) => i.status === "Resolved").length,
+    }),
+    [incidents],
+  );
 
   return (
     <>
@@ -293,16 +253,38 @@ export default function Incidents() {
       <div className="flex flex-col gap-3 border-b border-zinc-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <Tabs defaultValue="all" value={tab} onValueChange={setTab}>
           <TabsList variant="line" className="pb-1">
-            <TabsTrigger value="all" className="text-zinc-400 data-active:text-zinc-100">
+            <TabsTrigger
+              value="all"
+              className="text-zinc-400 data-active:text-zinc-100"
+            >
               All
             </TabsTrigger>
-            <TabsTrigger value="active" className="text-zinc-400 data-active:text-zinc-100">
-              Active {counts.active > 0 && <span className="ml-1 rounded-full bg-red-900/60 px-1.5 text-[10px] text-red-300">{counts.active}</span>}
+            <TabsTrigger
+              value="active"
+              className="text-zinc-400 data-active:text-zinc-100"
+            >
+              Active{" "}
+              {counts.active > 0 && (
+                <span className="ml-1 rounded-full bg-red-900/60 px-1.5 text-[10px] text-red-300">
+                  {counts.active}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="monitoring" className="text-zinc-400 data-active:text-zinc-100">
-              Monitoring {counts.monitoring > 0 && <span className="ml-1 rounded-full bg-orange-900/60 px-1.5 text-[10px] text-orange-300">{counts.monitoring}</span>}
+            <TabsTrigger
+              value="monitoring"
+              className="text-zinc-400 data-active:text-zinc-100"
+            >
+              Monitoring{" "}
+              {counts.monitoring > 0 && (
+                <span className="ml-1 rounded-full bg-orange-900/60 px-1.5 text-[10px] text-orange-300">
+                  {counts.monitoring}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="resolved" className="text-zinc-400 data-active:text-zinc-100">
+            <TabsTrigger
+              value="resolved"
+              className="text-zinc-400 data-active:text-zinc-100"
+            >
               Resolved
             </TabsTrigger>
           </TabsList>
@@ -348,10 +330,7 @@ export default function Incidents() {
               Fill in details and create a new incident.
             </DialogDescription>
           </DialogHeader>
-          <form
-            className="mt-4 space-y-4 px-4 pb-4"
-            onSubmit={handleCreate}
-          >
+          <form className="mt-4 space-y-4 px-4 pb-4" onSubmit={handleCreate}>
             <div className="space-y-2">
               <label className="text-sm text-zinc-300">Incident</label>
               <Input
