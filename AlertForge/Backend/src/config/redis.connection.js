@@ -22,20 +22,21 @@ export const getRedisClient = async () => {
     }
 
     try {
+        // Fix: If URL starts with rediss://, node-redis v4+ might conflict with explicit tls options.
+        // We strip the 's' and manually enable the TLS socket.
+        const normalizedUrl = redisUrl.replace("rediss://", "redis://");
+
         redisClient = createClient({ 
-            url: redisUrl,
+            url: normalizedUrl,
             socket: {
-                tls: redisUrl.startsWith("rediss") ? {
-                    rejectUnauthorized: false // Critical for some cloud environments
-                } : false,
+                tls: redisUrl.startsWith("rediss"), // Manually enable TLS
                 reconnectStrategy: (retries) => {
-                    // Start fast, then slow down up to 10 seconds between attempts
                     return Math.min(retries * 200, 10000);
                 },
-                connectTimeoutMs: 20000, // 20 seconds for slow cold-starts
-                keepAlive: 30000, // TCP keep-alive
+                connectTimeoutMs: 20000,
+                keepAlive: 30000,
             },
-            pingInterval: 30000 // Send a PING every 30 seconds to stay alive
+            pingInterval: 30000
         });
 
         redisClient.on("error", (err) => {
