@@ -36,7 +36,7 @@ app.use(publicApiLimiter);
 
 //NOTE -  Middleware
 app.use(cors({
-    origin: true, // Support both standard React/Vite ports
+    origin: ["http://localhost:5173", "https://alertforge.onrender.com"], // Support local dev and production Render URL
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],

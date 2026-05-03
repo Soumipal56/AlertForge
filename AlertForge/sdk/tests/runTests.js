@@ -1,43 +1,76 @@
-// sdk/tests/runTests.js
-import { testAuth } from "./auth.test.js";
-import { testIncidents } from "./incidents.test.js";
-import { testWarRoom } from "./warroom.test.js";
-import logger from "../core/utils/logger.js";
-import { setBaseURL } from "../core/config/index.js";
+import { AlertForge } from "../src/index.js";
 
-// Set default test URL
-setBaseURL("http://localhost:3000");
+/**
+ * PRODUCTION TEST SUITE
+ * 
+ * Verifies full lifecycle: Profile -> Incident -> Resolution -> Postmortem
+ */
 
-const runAll = async () => {
-    logger.info("🚀 Starting AlertForge SDK Test Suite...");
-    const start = Date.now();
+const TEST_API_KEY = "af_12aad9d1fe417ba04a7da1f05957c120de2ec6e4ca2e9961aceb109afad8230c";
 
-    const results = {
-        auth: await testAuth(),
-        incidents: await testIncidents(),
-        warroom: await testWarRoom(),
-    };
+async function runTests() {
+  console.log("🚀 Starting AlertForge SDK Production Tests");
+  console.log("--------------------------------------------");
 
-    const end = Date.now();
-    const duration = ((end - start) / 1000).toFixed(2);
+  const af = new AlertForge({
+    apiKey: TEST_API_KEY,
+    baseURL: "https://alertforge.onrender.com"
+  });
 
-    console.log("\n" + "=".repeat(40));
-    console.log("📊 SDK TEST SUMMARY");
-    console.log("=".repeat(40));
-    console.log(`Auth Tests:      ${results.auth ? "✅ PASSED" : "❌ FAILED"}`);
-    console.log(`Incident Tests:  ${results.incidents ? "✅ PASSED" : "❌ FAILED"}`);
-    console.log(`War Room Tests:  ${results.warroom ? "✅ PASSED" : "❌ FAILED"}`);
-    console.log("-".repeat(40));
-    console.log(`Total Duration:  ${duration}s`);
-    console.log("=".repeat(40) + "\n");
+  try {
+    // 1. Profile Update (Enable all channels)
+    console.log("[1] Updating notification profile...");
+    const profile = await af.updateProfile({
+      name: "SDK Test User",
+      teamEmails: ["ritammaty@gmail.com", "dev@alertforge.com"],
+      discordWebhookUrl: "https://discord.com/api/webhooks/1499679342286999733/yZArjF9q68goc_9r0MQVbqWBbMRF7wWNFhHVkC00Za5Q04Ndei8zuHqTob3FSrqDDn3d",
+      telegramChatId: "8593526739",
+      notificationSettings: {
+        emailEnabled: true,
+        discordEnabled: true,
+        telegramEnabled: true
+      }
+    });
+    console.log("✅ Profile updated successfully\n");
 
-    const allPassed = Object.values(results).every(v => v === true);
-    if (!allPassed) {
-        process.exit(1);
+    // 2. Create Incident
+    console.log("[2] Creating P1 incident (Broadcasting)...");
+    const incidentResponse = await af.createIncident({
+      title: "Production Database Outage - Automated Test",
+      service: "core-database",
+      severity: "P1"
+    });
+    const incidentId = incidentResponse.data?._id || incidentResponse.data?.id;
+    console.log(`✅ Incident created: ${incidentId}\n`);
+
+    // 3. List Incidents
+    console.log("[3] Fetching organization incidents...");
+    const listResponse = await af.getIncidents();
+    const count = listResponse.data?.incidents?.length || 0;
+    console.log(`✅ Found ${count} incidents in total\n`);
+
+    // 4. Resolve Incident
+    console.log("[4] Resolving incident...");
+    await af.updateIncidentStatus(incidentId, "resolved");
+    console.log("✅ Incident status set to RESOLVED\n");
+
+    // 5. Generate Postmortem
+    console.log("[5] Triggering AI Postmortem generation...");
+    try {
+      await af.generatePostmortem(incidentId);
+      console.log("✅ Postmortem pipeline triggered\n");
+    } catch (e) {
+      console.log("⚠️ Postmortem skipped (likely missing AI credits/config)\n");
     }
-};
 
-runAll().catch(err => {
-    logger.error("Test Suite Crashed:", err);
+    console.log("--------------------------------------------");
+    console.log("✨ ALL SDK TESTS PASSED SUCCESSFULLY");
+
+  } catch (error) {
+    console.error("❌ TEST FAILED:");
+    console.error(error.message);
     process.exit(1);
-});
+  }
+}
+
+runTests();

@@ -1,0 +1,22 @@
+{
+  "name": "alertforge-sdk",
+  "version": "1.0.4",
+  "description": "Stateless Node.js SDK for AlertForge Incident Management",
+  "main": "./src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/runTests.js"
+  },
+  "keywords": [
+    "alertforge",
+    "incident-management",
+    "alerts",
+    "on-call",
+    "devops"
+  ],
+  "author": "AlertForge Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2"
+  }
+}

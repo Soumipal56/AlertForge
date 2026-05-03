@@ -1,75 +1,115 @@
-# AlertForge SDK
+# @alertforge/sdk
 
-The official JavaScript SDK for AlertForge. This SDK provides a modular, production-ready interface for interacting with the AlertForge incident management platform.
+The official Node.js SDK for the AlertForge Incident Management Platform.
 
-## 🚀 Features
+AlertForge is a stateless, production-grade incident response system. This SDK allows you to programmatically manage incidents, update notification profiles, and generate AI-powered postmortems using only an API Key.
 
-- **Modular Design**: Choose only the modules you need (`auth`, `incidents`, `warroom`, etc.).
-- **Dynamic Configuration**: Supports dynamic base URLs for local development and production.
-- **Dual Auth**: Supports both JWT (Dashboard) and API Key (SDK/Automations) authentication.
-- **Real-time Ready**: Integrated Socket.io client for War Room collaboration.
+---
 
-## 📦 Installation
+## 🔑 Authentication
+
+AlertForge uses a stateless API Key authentication model. You do not need to manage JWTs or user sessions.
+
+1. Generate an API Key from the AlertForge Dashboard.
+2. Initialize the SDK with the key.
+
+---
+
+## 🚀 Installation
+
+Install the SDK via npm:
 
 ```bash
-# Future NPM command
-npm install @alertforge/sdk
+npm install alertforge-sdk
 ```
 
-For local development, you can link this folder using `npm link` or directly import from the directory.
+---
 
-## 🔧 Configuration
+## 🛠️ Usage
+
+### Initialization
 
 ```javascript
-import { setBaseURL, setApiKey } from "./sdk";
+import { AlertForge } from "alertforge-sdk";
 
-// Local development defaults to http://localhost:3000
-setBaseURL("http://localhost:3000");
-setApiKey("your-org-api-key");
+const af = new AlertForge({
+  apiKey: "af_your_secret_key",
+  baseURL: "https://alertforge.onrender.com" // Optional: defaults to production
+});
 ```
 
-## 📖 Usage Examples
+### ⚠️ IMPORTANT: Setup Notifications First
 
-### Authentication
+Before creating your first incident, you **MUST** update your profile to configure where notifications should be sent. AlertForge uses these settings to determine which channels (Email, Telegram, Discord) to trigger during a broadcast.
+
 ```javascript
-import { auth } from "./sdk";
+// Step 1: Configure your notification stack
+await af.updateProfile({
+  name: "On-Call Engineer",
+  teamEmails: ["alerts@company.com"],
+  discordWebhookUrl: "https://discord.com/api/webhooks/...",
+  telegramChatId: "987654321",
+  notificationSettings: {
+    emailEnabled: true,
+    discordEnabled: true,
+    telegramEnabled: true
+  }
+});
 
-const session = await auth.login("admin@acme.com", "SecurePass123!");
-console.log("Logged in:", session.user.name);
+// Step 2: Now you can broadcast incidents safely
+const incident = await af.createIncident({ ... });
 ```
 
 ### Incident Management
-```javascript
-import { incidents } from "./sdk";
 
-const newIncident = await incidents.createIncident({
-    message: "High Latency in US-East-1",
-    service: "Checkout Service",
-    severity: "high"
+#### Create an Incident
+
+Broadcasting will immediately trigger alerts across all configured channels (Email, Telegram, Discord).
+
+```javascript
+const incident = await af.createIncident({
+  title: "High Error Rate in Checkout Service",
+  service: "payments-api",
+  severity: "P1"
 });
+
+console.log("Created Incident:", incident.data._id);
 ```
 
-### War Room & Sockets
+#### List Incidents
+
 ```javascript
-import { connectSocket, warroom } from "./sdk";
-
-const socket = connectSocket();
-warroom.joinWarRoom("incident-id-123");
-
-warroom.listenToPresence(({ count }) => {
-    console.log(`There are ${count} responders in the room.`);
-});
+const response = await af.getIncidents();
+console.log("Incidents:", response.data.incidents);
 ```
 
-## 🧪 Running Tests
+#### Update Status
 
-The SDK includes a built-in test suite to validate integration with the AlertForge backend.
+```javascript
+await af.updateIncidentStatus("incident_id", "resolved");
+```
+
+
+### AI Postmortem
+
+Trigger an automated AI analysis of a resolved incident.
+
+```javascript
+await af.generatePostmortem("incident_id");
+```
+
+---
+
+## 🧪 Development & Testing
+
+To run the integration tests:
 
 ```bash
-# Run all tests
-node sdk/tests/runTests.js
+npm test
 ```
 
-## 📄 License
+---
+
+## 📜 License
 
 MIT

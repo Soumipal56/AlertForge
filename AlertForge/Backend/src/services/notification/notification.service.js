@@ -64,8 +64,8 @@ const logSettledResults = (channel, targets, results) => {
 export const sendEmailNotifications = async (user, payload) => {
     const userId = user?._id?.toString() || user?.id || "unknown";
 
-    if (!user?.notificationSettings?.emailEnabled) {
-        console.log(`[Notification:email] Skipped for user ${userId}: email notifications disabled`);
+    if (user?.notificationSettings?.emailEnabled === false) {
+        console.log(`[Notification:email] Skipped for user ${userId}: email notifications explicitly disabled`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
@@ -96,8 +96,8 @@ export const sendEmailNotifications = async (user, payload) => {
 export const sendTelegramNotifications = async (user, payload) => {
     const userId = user?._id?.toString() || user?.id || "unknown";
 
-    if (!user?.notificationSettings?.telegramEnabled) {
-        console.log(`[Notification:telegram] Skipped for user ${userId}: Telegram notifications disabled`);
+    if (user?.notificationSettings?.telegramEnabled === false) {
+        console.log(`[Notification:telegram] Skipped for user ${userId}: Telegram notifications explicitly disabled`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
@@ -127,8 +127,8 @@ export const sendTelegramNotifications = async (user, payload) => {
 export const sendDiscordNotifications = async (user, payload) => {
     const userId = user?._id?.toString() || user?.id || "unknown";
 
-    if (!user?.notificationSettings?.discordEnabled) {
-        console.log(`[Notification:discord] Skipped for user ${userId}: Discord notifications disabled`);
+    if (user?.notificationSettings?.discordEnabled === false) {
+        console.log(`[Notification:discord] Skipped for user ${userId}: Discord notifications explicitly disabled`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
