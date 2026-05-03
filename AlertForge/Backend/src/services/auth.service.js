@@ -2,8 +2,8 @@ import bcrypt from "bcryptjs";
 import ApiError from "../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/token.js";
 import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants.js";
-import { createUserDAO, findUserByEmailDAO, findUserByEmailWithPasswordDAO, findUserByIdDAO } from "../dao/user.dao.js";
-import { createApiKeyDAO } from "../dao/apikey.dao.js";
+import { createUserDAO, findUserByEmailDAO, findUserByEmailWithPasswordDAO, findUserByIdDAO, updateUserByIdDAO } from "../dao/user.dao.js";
+import { createApiKeyService } from "./apikey.service.js";
 import { generateApiKey } from "../utils/generateApiKey.js";
 import { hashKey } from "../utils/hashKey.js";
 
@@ -44,7 +44,7 @@ export const registerService = async ({ email, password }) => {
     }
 
     const rawApiKey = generateApiKey();
-    await createApiKeyDAO({
+    await createApiKeyService({
         key: hashKey(rawApiKey),
         user: user._id,
         isActive: true,
@@ -58,6 +58,7 @@ export const registerService = async ({ email, password }) => {
         refreshToken: generateRefreshToken(userId),
     };
 };
+
 
 export const loginService = async ({ email, password }) => {
     const normalizedEmail = normalizeEmail(email);
@@ -87,6 +88,62 @@ export const loginService = async ({ email, password }) => {
         refreshToken: generateRefreshToken(userId),
     };
 };
+
+export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail) {
+        throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email is required from Google");
+    }
+
+    // 1. Find user by email (don't search by googleId yet to avoid duplicates)
+    let user = await findUserByEmailDAO(normalizedEmail);
+
+    if (user) {
+        // 2. If user exists, check if googleId is already linked
+        if (user.googleId) {
+            // Security Check: Ensure the same Google account is being used
+            if (user.googleId !== googleId) {
+                throw new ApiError(
+                    HTTP_STATUS.CONFLICT,
+                    "This email is already linked to a different Google account."
+                );
+            }
+        } else {
+            // 3. If user exists but has no googleId, link it
+            user = await updateUserByIdDAO(user._id, { googleId, avatar });
+        }
+        return user;
+    }
+
+    // 4. If user doesn't exist, create a new one
+    try {
+        user = await createUserDAO({
+            email: normalizedEmail,
+            emailAddress: normalizedEmail,
+            name,
+            googleId,
+            avatar,
+            isVerified: true, // Google emails are verified
+            role: "admin",    // Default role
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            const duplicateField = Object.keys(error.keyPattern || {})[0];
+            const message = duplicateField === "email"
+                ? "User already exists with this email"
+                : duplicateField === "googleId"
+                    ? "This Google account is already linked to another user"
+                    : `Duplicate user conflict: ${duplicateField}`;
+
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, message);
+        }
+        throw error;
+    }
+
+    return user;
+};
+
 
 export const refreshAccessTokenService = async (refreshToken) => {
     if (!refreshToken) {

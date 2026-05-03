@@ -103,17 +103,26 @@ export const initSocket = async (httpServer) => {
     });
 
     ioInstance.on("connection", (socket) => {
-        console.log(`[Socket] Connected: ${socket.id} (user: ${socket.user.name}, service: ${socket.user.serviceName})`);
+        console.log(`[Socket] Connected: ${socket.id} (user: ${socket.user.name})`);
 
         /**
-         * @description Joins the global war room for the service.
+         * @description Unified room joining (for service or incident)
          */
-        socket.on("join_warroom", async (_payload, ack) => {
+        socket.on("room:join", async (payload = {}, ack) => {
             try {
-                if (!await throttleSocketEvent(socket, "join_room", rateLimitConfig.socket.join)) return;
+                const { roomType, id } = payload; // roomType: 'service' | 'incident'
+                let room = "";
 
-                const room = normalizeRoomName(socket.user.serviceName);
-                if (!room) throw new Error("War room could not be resolved");
+                if (roomType === "service") {
+                    room = normalizeRoomName(socket.user.serviceName);
+                } else if (roomType === "incident") {
+                    if (!id) throw new Error("Incident ID required");
+                    const incident = await getIncidentByIdService(id, socket.user.apiKeyId); // Note: still using apiKeyId here for SDK compatibility
+                    if (!incident) throw new Error("Incident not found/unauthorized");
+                    room = normalizeRoomName(`incident:${id}`);
+                } else {
+                    throw new Error("Invalid room type");
+                }
 
                 socket.join(room);
                 socket.data.activeRoom = room;
@@ -121,8 +130,8 @@ export const initSocket = async (httpServer) => {
                 const count = await addUser(room, socket.id);
                 const recentMessages = await getRecentWarRoomMessages(room);
 
-                // Broadcast presence
-                ioInstance.to(room).emit("room:presence", { room, count });
+                // Broadcast presence update
+                ioInstance.to(room).emit("presence:update", { room, count, user: socket.user });
 
                 if (typeof ack === "function") {
                     ack({
@@ -134,12 +143,12 @@ export const initSocket = async (httpServer) => {
                 }
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
-                emitSocketError(socket, "VALIDATION_ERROR", error.message);
+                emitSocketError(socket, "JOIN_ERROR", error.message);
             }
         });
 
         /**
-         * @description Joins an incident-specific war room.
+         * @description Leaves a room explicitly
          */
         socket.on("join_incident_room", async (payload = {}, ack) => {
             try {
@@ -172,21 +181,23 @@ export const initSocket = async (httpServer) => {
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
                 emitSocketError(socket, "VALIDATION_ERROR", error.message);
+        socket.on("room:leave", (payload = {}, ack) => {
+            const { room } = payload;
+            if (room) {
+                socket.leave(room);
+                const count = removeUser(room, socket.id);
+                ioInstance.to(room).emit("presence:update", { room, count, user: socket.user, action: "left" });
+                if (typeof ack === "function") ack({ success: true });
             }
         });
 
         /**
-         * @description Handles real-time chat messages.
+         * @description Standardized message event
          */
-        socket.on("chat:message", async (payload = {}, ack) => {
+        socket.on("message:new", async (payload = {}, ack) => {
             try {
-                if (!await throttleSocketEvent(socket, "chat:message", rateLimitConfig.socket.message)) return;
-
                 const room = socket.data.activeRoom;
-                if (!room || !socket.rooms.has(room)) throw new Error("Join a room first");
-
-                const validation = validateWarRoomMessage(payload?.content);
-                if (!validation.valid && !payload?.fileUrl) throw new Error(validation.message || "Invalid message");
+                if (!room) throw new Error("Not in a room");
 
                 const savedMessage = await saveWarRoomMessage({
                     roomId: room,
@@ -198,7 +209,7 @@ export const initSocket = async (httpServer) => {
                 });
 
                 const messagePayload = toMessagePayload(savedMessage);
-                ioInstance.to(room).emit("chat:message", messagePayload);
+                ioInstance.to(room).emit("message:new", messagePayload);
 
                 if (room.startsWith("incident:")) {
                     const incidentId = room.split(":")[1];
@@ -208,7 +219,26 @@ export const initSocket = async (httpServer) => {
                 if (typeof ack === "function") ack({ success: true, message: messagePayload });
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
-                emitSocketError(socket, "VALIDATION_ERROR", error.message);
+                emitSocketError(socket, "MESSAGE_ERROR", error.message);
+            }
+        });
+
+        /**
+         * @description Task status update event
+         */
+        socket.on("task:update", async (payload = {}, ack) => {
+            try {
+                const { messageId, isCompleted } = payload;
+                const room = socket.data.activeRoom;
+                if (!room) throw new Error("Not in a room");
+
+                // Broadcast update to the room
+                ioInstance.to(room).emit("task:update", { messageId, isCompleted, updatedBy: socket.user.name });
+
+                if (typeof ack === "function") ack({ success: true });
+            } catch (error) {
+                if (typeof ack === "function") ack({ success: false, message: error.message });
+                emitSocketError(socket, "TASK_ERROR", error.message);
             }
         });
 
@@ -220,6 +250,7 @@ export const initSocket = async (httpServer) => {
             }
         });
     });
+
 
     return ioInstance;
 };

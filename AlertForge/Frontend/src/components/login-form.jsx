@@ -35,17 +35,10 @@ export function LoginForm({ ...props }) {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    if (!isLoaded) return;
-    try {
-      await signIn.authenticateWithRedirect({
-        strategy: "oauth_google",
-        redirectUrl: `${window.location.origin}/sso-callback`,
-        redirectUrlComplete: `${window.location.origin}/dashboard`,
-      });
-    } catch (err) {
-      setError(err.errors?.[0]?.message || "Google sign in failed.");
-    }
+  const handleGoogleLogin = () => {
+    // Redirect to backend Google OAuth endpoint (custom Passport.js auth)
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    window.location.href = `${apiUrl}/api/auth/google`;
   };
 
   return (

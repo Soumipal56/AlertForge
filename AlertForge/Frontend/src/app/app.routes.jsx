@@ -65,6 +65,8 @@ export const routes = createBrowserRouter([
     path: "/dashboard",
     element: <DashboardLayout />,
     children: [
+
+
       {
         index: true,
         element: <Overview />,
@@ -95,10 +97,6 @@ export const routes = createBrowserRouter([
         path: "integrations",
         element: <Integrations />,
       },
-      // {
-      //   path: "integrations/api-keys",
-      //   element: <ApiKeys />,
-      // },
       {
         path: "status",
         element: <StatusPage />,

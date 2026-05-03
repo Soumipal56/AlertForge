@@ -1,9 +1,8 @@
 import mongoose from "mongoose";
 
 /**
- * Stores one chat message for a War Room.
- * The room is derived from the API key, so we keep it as a plain string
- * instead of introducing a separate user or membership model.
+ * FEATURE-4: War Room message schema supporting structured types.
+ * Supports: chat messages, internal notes, tasks, and file attachments.
  */
 const warRoomMessageSchema = new mongoose.Schema({
     roomId: {
@@ -11,6 +10,19 @@ const warRoomMessageSchema = new mongoose.Schema({
         required: true,
         trim: true,
         index: true,
+    },
+    organizationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
+    },
+
+    // Structured type system
+    type: {
+        type: String,
+        enum: ["message", "note", "task", "file"],
+        default: "message",
     },
     content: {
         type: String,
@@ -26,6 +38,20 @@ const warRoomMessageSchema = new mongoose.Schema({
         type: String,
         enum: ["image", "pdf", null],
         default: null,
+    },
+    // FEATURE-4: Task system fields
+    isCompleted: {
+        type: Boolean,
+        default: false,
+    },
+    assignedTo: {
+        type: String,
+        default: null,
+    },
+    // Visibility — false = internal note for responders only
+    isPublic: {
+        type: Boolean,
+        default: true,
     },
     sender: {
         apiKeyId: {
@@ -47,9 +73,7 @@ const warRoomMessageSchema = new mongoose.Schema({
 });
 
 /**
- * Custom validation logic:
- * A message is valid if it has either text content or a file attachment.
- * It should only fail if both are missing.
+ * Custom validation: a message is valid if it has text OR file.
  */
 warRoomMessageSchema.pre("validate", async function () {
     if (!this.content && !this.fileUrl) {
@@ -62,3 +86,4 @@ warRoomMessageSchema.index({ roomId: 1, createdAt: -1 });
 const warRoomMessageModel = mongoose.model("WarRoomMessage", warRoomMessageSchema);
 
 export default warRoomMessageModel;
+

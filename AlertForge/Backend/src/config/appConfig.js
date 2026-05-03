@@ -36,6 +36,10 @@ const appConfig = {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
     tavilyApiKey: process.env.TAVILY_API_KEY,
+    googleClientId: process.env.CLIENT_ID,
+    googleClientSecret: process.env.CLIENT_SECRET,
+    googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL,
+    frontendUrl: process.env.FRONTEND_URL,
 };
 
 export default appConfig;

@@ -34,15 +34,18 @@ export const SUCCESS_MESSAGES = {
 };
 
 export const INCIDENT_STATUS = {
-    OPEN: "open",
+    ACTIVE: "active",
     INVESTIGATING: "investigating",
     IDENTIFIED: "identified",
     MONITORING: "monitoring",
     RESOLVED: "resolved",
 };
 
+
+
 export const SEVERITY = {
-    LOW: "low",
-    MEDIUM: "medium",
-    HIGH: "high",
+    P1: "P1",
+    P2: "P2",
+    P3: "P3",
 };
+

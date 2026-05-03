@@ -1,21 +1,22 @@
 import mongoose from "mongoose";
 import { INCIDENT_STATUS, SEVERITY } from "../config/constants.js";
 
-
 /**  
- * @typedef {Object} Incident
- * @property {string} message - Description of the incident
- * @property {string} service - Affected service or component
- * @property {string} severity - Severity level (low, medium, high)
- * @property {string} status - Current status of the incident (open, investigating, identified, monitoring, resolved)
- * @property {Date} createdAt - Timestamp when the incident was created
- * @property {Date} updatedAt - Timestamp when the incident was last updated
- * @description Mongoose schema and model for an Incident in the AlertForge system
+ * Incident model — title is the canonical field since the UI migration.
+ * 'message' is kept for backward compatibility with existing SDK webhooks.
+ * A pre-save hook keeps both fields in sync so no consumer breaks.
  */
 const incidentSchema = new mongoose.Schema({
-    message: {
+    // CANONICAL: used by dashboard UI
+    title: {
         type: String,
         required: true,
+        trim: true,
+    },
+    // LEGACY: kept for SDK / webhook consumers — auto-synced from title
+    message: {
+        type: String,
+        trim: true,
     },
     service: {
         type: String,
@@ -24,44 +25,67 @@ const incidentSchema = new mongoose.Schema({
     severity: {
         type: String,
         enum: Object.values(SEVERITY),
-        default: SEVERITY.MEDIUM,
+        default: SEVERITY.P3,
     },
     status: {
         type: String,
         enum: Object.values(INCIDENT_STATUS),
-        default: INCIDENT_STATUS.OPEN,
+        default: INCIDENT_STATUS.INVESTIGATING,
+        index: true,
     },
-    impact: {
-        type: String, // "payments failed", "500 users affected"
+    startedAt: {
+        type: Date,
+        default: Date.now,
     },
-
     resolvedAt: {
         type: Date,
     },
-
-    // metadata for AI
+    responders: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+        }
+    ],
     metadata: {
-        type: Object, // webhook payload / logs
+        type: Object,
     },
     realWorldInsights: {
         type: String,
         default: "",
     },
     /**
-     * Ownership ID (API Key reference).
-     * This is the primary field for authorization. 
-     * We enforce that an incident can only be accessed by the key that created it.
+     * Ownership ID (API Key reference) — primary scoping field.
+     * Incidents are only accessible by the key that created them.
      */
     apiKeyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "ApiKey",
         required: true,
         index: true,
+    },
+    organizationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
     }
 }, {
+
     timestamps: true
 });
+
+/**
+ * Backward-compat sync: ensure title ↔ message are always both populated.
+ * - If only 'title' sent (new UI):  message = title
+ * - If only 'message' sent (SDK):   title = message
+ */
+incidentSchema.pre("save", function () {
+    if (this.title && !this.message) this.message = this.title;
+    if (this.message && !this.title) this.title = this.message;
+});
+
 
 const incidentModel = mongoose.model("Incident", incidentSchema);
 
 export default incidentModel;
+

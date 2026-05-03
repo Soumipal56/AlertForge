@@ -6,7 +6,7 @@ import { RouterProvider } from "react-router";
 function App() {
   return (
     <>
-      <header className="app-header">
+      {/* <header className="app-header">
         <div className="header-container">
           <div className="logo">
             <span className="logo-text">AlertForge</span>
@@ -25,7 +25,7 @@ function App() {
             </Show>
           </div>
         </div>
-      </header>
+      </header> */}
       <main className="app-content">
         <RouterProvider router={routes} />
       </main>

@@ -10,14 +10,23 @@ export const createTimelineEventDAO = async (data) => {
 };
 
 /**
- * Fetches recent timeline entries for a given incident.
+ * Fetches recent timeline entries for a given incident with pagination.
  * @param {string} incidentId
+ * @param {number} page
  * @param {number} limit
  * @returns {Promise<Array>}
  */
-export const getTimelineEventsByIncidentDAO = async (incidentId, limit = 50) => {
+export const getTimelineEventsByIncidentDAO = async (incidentId, organizationId, page = 1, limit = 20) => {
+    const safeLimit = Math.min(limit || 20, 50);
+    const skip = (page - 1) * safeLimit;
+
     return await timelineEventModel
-        .find({ incidentId })
+        .find({ incidentId, organizationId })
         .sort({ createdAt: -1 })
-        .limit(limit);
+        .skip(skip)
+        .limit(safeLimit)
+        .lean();
 };
+
+
+

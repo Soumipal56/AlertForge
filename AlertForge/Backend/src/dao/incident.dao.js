@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import incidentModel from "../model/Incident.model.js";
+import { INCIDENT_STATUS } from "../config/constants.js";
 
 /**  
  * @description DAO function to create a new incident in the database
@@ -11,29 +13,93 @@ export const createIncidentDAO = async (data) => {
 
 /**  
  * @description DAO function to retrieve all incidents from the database, sorted by creation date
- * @returns {Array} List of incident documents from the database
+ * Supports optional status-based filtering.
  */
-export const getAllIncidentsDAO = async (apiKeyId) => {
-    return await incidentModel.find({ apiKeyId }).sort({ createdAt: -1 });
+export const getAllIncidentsDAO = async (organizationId, status = null) => {
+    const query = { organizationId };
+    if (status && status !== "all") {
+        query.status = status;
+    }
+    
+    const incidents = await incidentModel.find(query).sort({ createdAt: -1 }).lean();
+    
+    return incidents.map(incident => ({
+        ...incident,
+        title: incident.title || incident.message
+    }));
 };
+
+/**
+ * @description DAO function to aggregate incident counts grouped by status.
+ */
+export const getIncidentCountsDAO = async (organizationId) => {
+    const validStatuses = Object.values(INCIDENT_STATUS);
+    return await incidentModel.aggregate([
+        { 
+            $match: { 
+                organizationId: new mongoose.Types.ObjectId(organizationId),
+                status: { $in: validStatuses }
+            } 
+        },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+};
+
 /**  
  * @description DAO function to retrieve a single incident by its ID from the database
- * @param {string} id - The ID of the incident to retrieve
- * @returns {Object} The incident document from the database, or null if not found
  */
-export const getIncidentByIdDAO = async (id, apiKeyId) => {
-    return await incidentModel.findOne({ _id: id, apiKeyId });
+export const getIncidentByIdDAO = async (id, organizationId) => {
+    const incident = await incidentModel.findOne({ _id: id, organizationId }).lean();
+    if (!incident) return null;
+    
+    return {
+        ...incident,
+        title: incident.title || incident.message
+    };
 };
+
 /**  
- * @description DAO function to update the status of an incident in the database
- * @param {string} id - The ID of the incident to update
- * @param {string} status - The new status to set for the incident
- * @returns {Object} The updated incident document from the database, or null if not found
+ * @description DAO function to update the severity of an incident
  */
-export const updateIncidentStatusDAO = async (id, apiKeyId, status, extraUpdates = {}) => {
+export const updateIncidentSeverityDAO = async (id, organizationId, severity) => {
     return await incidentModel.findOneAndUpdate(
-        { _id: id, apiKeyId },
+        { _id: id, organizationId },
+        { $set: { severity } },
+        { returnDocument: "after", runValidators: true }
+    ).lean();
+};
+
+/**  
+ * @description DAO function to update the status of an incident
+ */
+export const updateIncidentStatusDAO = async (id, organizationId, status, extraUpdates = {}) => {
+    return await incidentModel.findOneAndUpdate(
+        { _id: id, organizationId },
         { $set: { status, ...extraUpdates } },
         { returnDocument: "after", runValidators: true }
-    );
+    ).lean();
 };
+
+/**
+ * Returns counts of active/monitoring incidents for a service to drive status sync.
+ */
+export const getIncidentStatsByServiceDAO = async (serviceName, organizationId) => {
+    const results = await incidentModel.aggregate([
+        { 
+            $match: { 
+                service: serviceName, 
+                organizationId: new mongoose.Types.ObjectId(organizationId),
+                status: { $ne: INCIDENT_STATUS.RESOLVED } 
+            } 
+        },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+
+    const stats = { active: 0, monitoring: 0 };
+    results.forEach(res => {
+        if (res._id === INCIDENT_STATUS.MONITORING) stats.monitoring += res.count;
+        else stats.active += res.count; 
+    });
+    return stats;
+};
+

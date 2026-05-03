@@ -1,75 +1,89 @@
-import { createIncidentService, getAllIncidentsService, getIncidentByIdService, updateIncidentStatusService } from "../services/incident.service.js";
+import { 
+    createIncidentService, 
+    getAllIncidentsService, 
+    getIncidentByIdService, 
+    updateIncidentStatusService, 
+    updateIncidentSeverityService 
+} from "../services/incident.service.js";
+import { 
+    getTimelineEventsByIncidentService,
+    createTimelineEventService
+} from "../services/timeline/timeline.service.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
-import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, INCIDENT_STATUS } from "../config/constants.js";
-import { sendIncidentNotifications } from "../services/notification/notification.service.js";
-import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "../services/socket/socket.service.js";
-import { createTimelineEventService } from "../services/timeline/timeline.service.js";
-import { generatePostmortem } from "../services/postmortem.service.js";
+import { HTTP_STATUS, SUCCESS_MESSAGES, INCIDENT_STATUS } from "../config/constants.js";
+import { TIMELINE_EVENTS } from "../utils/timeline.constants.js";
+import { emitTimelineEvent } from "../services/socket/socket.service.js";
 
-const buildIncidentSocketPayload = (incident) => ({
-    id: incident?._id?.toString?.() || incident?.id || null,
-    message: incident?.message,
-    severity: incident?.severity,
-    status: incident?.status,
-    createdAt: incident?.createdAt,
-    updatedAt: incident?.updatedAt,
-});
-
-const saveTimelineEntry = async (type, incident, message = "") => {
-    // Save timeline event after incident changes so the activity feed survives refreshes.
+/**
+ * @description Controller function to retrieve the timeline of an incident
+ */
+export const getIncidentTimeline = async (req, res, next) => {
     try {
-        await createTimelineEventService({
-            type,
-            incidentId: incident?._id?.toString?.() || incident?.id,
-            message,
-        });
+        const { id } = req.params;
+        const { page, limit } = req.query;
+
+        const timeline = await getTimelineEventsByIncidentService(
+            id, 
+            req.user.organizationId, 
+            page ? parseInt(page) : 1,
+            limit ? parseInt(limit) : 20
+        );
+
+        return res.json(new ApiResponse(200, "Timeline fetched", timeline));
     } catch (error) {
-        console.error("[Timeline] Failed to persist timeline entry:", error.message);
+        next(error);
     }
 };
 
-/**  
- * @description Controller function to create a new incident
- * - Validates the request body using Zod schema
- * - Calls the service function to create the incident
- * - Returns a standardized API response with the created incident data
- * @param {Object} req - Express request object containing incident data in req.body
- * @param {Object} res - Express response object used to send the API response
- * @param {Function} next - Express next function for error handling
- * @returns {Object} API response with status code, message, and created incident data
+/**
+ * @description Controller function to add a manual note/event to the timeline
  */
+export const addTimelineNote = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { message, metadata, isPublic } = req.body;
+
+        if (!message) {
+            throw new ApiError(400, "Message is required for timeline note");
+        }
+
+        const timelineEvent = await createTimelineEventService({
+            type: TIMELINE_EVENTS.NOTE_ADDED,
+            incidentId: id,
+            message,
+            metadata: metadata || {},
+            createdBy: req.user?.id || null,
+            authorName: req.user?.name || "Responder",
+            isPublic: isPublic !== undefined ? isPublic : true,
+        }, req.user.organizationId);
+
+        // Trigger real-time update for timeline note
+        emitTimelineEvent({
+            type: TIMELINE_EVENTS.NOTE_ADDED,
+            incidentId: id,
+            event: timelineEvent
+        });
+
+        return res.status(201).json(new ApiResponse(201, "Note added to timeline", timelineEvent));
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
 export const createIncident = async (req, res, next) => {
     try {
         const data = req.body;
-        //NOTE- here will be validation using zod schema. If validation fails, it will throw an error which will be caught in the catch block and passed to the error handling middleware.
         const validation = incidentSchema.safeParse(data);
         if (!validation.success) {
-            throw new ApiError(
-                HTTP_STATUS.BAD_REQUEST,
-                validation.error.errors[0].message
-            );
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, validation.error.errors[0].message);
         }
 
-        const incident = await createIncidentService({
-            ...data,
-            apiKeyId: req.apiKey._id,
-        });
-        await saveTimelineEntry("incident.created", incident, incident?.message || "");
-
-        // Multi-channel notification fan-out
-        const user = req.apiKey.user;
-        if (user) {
-            sendIncidentNotifications(user, incident);
-        }
-
-        emitNewIncident(incident);
-        emitTimelineEvent({
-            type: "incident.created",
-            incident: buildIncidentSocketPayload(incident),
-        });
-
+        const incident = await createIncidentService(data, req.user, req.apiKey);
+        
         return res
             .status(HTTP_STATUS.CREATED)
             .json(new ApiResponse(
@@ -82,23 +96,26 @@ export const createIncident = async (req, res, next) => {
         next(error);
     }
 };
+
 /**  
- * @description Controller function to retrieve all incidents
- * - Calls the service function to get all incidents from the database
- * - Returns a standardized API response with the list of incidents
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object used to send the API response
- * @param {Function} next - Express next function for error handling
- * @returns {Object} API response with status code, message, and list of incidents
+ * @description Controller function to retrieve all incidents for the dashboard
  */
 export const getAllIncidents = async (req, res, next) => {
     try {
-        const incidents = await getAllIncidentsService(req.apiKey._id);
+        const { status } = req.query;
+        const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "all";
+
+        const validStatuses = ["all", ...Object.values(INCIDENT_STATUS)];
+        if (!validStatuses.includes(normalizedStatus)) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid status filter");
+        }
+
+        const { incidents, counts } = await getAllIncidentsService(req.user.organizationId, normalizedStatus);
 
         return res.json(new ApiResponse(
             HTTP_STATUS.OK,
             SUCCESS_MESSAGES.INCIDENT.FETCHED,
-            incidents
+            { incidents, counts }
         ));
 
     } catch (error) {
@@ -108,20 +125,11 @@ export const getAllIncidents = async (req, res, next) => {
 
 /**  
  * @description Controller function to retrieve a single incident by its ID
- * - Extracts the incident ID from the request parameters
- * - Calls the service function to get the incident from the database
- * - If the incident is not found, throws a 404 error
- * - Returns a standardized API response with the incident data if found
- * @param {Object} req - Express request object containing incident ID in req.params
- * @param {Object} res - Express response object used to send the API response
- * @param {Function} next - Express next function for error handling
- * @returns {Object} API response with status code, message, and incident data if found
  */
 export const getIncidentById = async (req, res, next) => {
     try {
         const { id } = req.params;
-
-        const incident = await getIncidentByIdService(id, req.apiKey._id);
+        const incident = await getIncidentByIdService(id, req.user.organizationId);
 
         if (!incident) {
             throw new ApiError(404, "Incident not found");
@@ -133,17 +141,8 @@ export const getIncidentById = async (req, res, next) => {
     }
 };
 
-
 /**  
  * @description Controller function to update the status of an incident
- * - Extracts the incident ID from the request parameters and new status from the request body
- * - Calls the service function to update the incident status in the database
- * - If the incident is not found, throws a 404 error
- * - Returns a standardized API response with the updated incident data if found
- * @param {Object} req - Express request object containing incident ID in req.params and new status in req.body
- * @param {Object} res - Express response object used to send the API response
- * @param {Function} next - Express next function for error handling
- * @returns {Object} API response with status code, message, and updated incident data if found
  */
 export const updateIncidentStatus = async (req, res, next) => {
     try {
@@ -151,45 +150,31 @@ export const updateIncidentStatus = async (req, res, next) => {
         const { status } = req.body;
         const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "";
 
-        if (!Object.values(INCIDENT_STATUS).includes(normalizedStatus)) {
-            throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Invalid incident status");
-        }
+        const updated = await updateIncidentStatusService(id, req.user.organizationId, req.apiKey._id, normalizedStatus, req.user);
 
-        const currentIncident = await getIncidentByIdService(id, req.apiKey._id);
-
-        if (!currentIncident) {
-            throw new ApiError(404, "Incident not found");
-        }
-
-        const isResolvedTransition = currentIncident.status !== INCIDENT_STATUS.RESOLVED && normalizedStatus === INCIDENT_STATUS.RESOLVED;
-        const updatePayload = isResolvedTransition ? { resolvedAt: new Date() } : {};
-        const updated = await updateIncidentStatusService(id, req.apiKey._id, normalizedStatus, updatePayload);
-
-        await saveTimelineEntry("incident.status_changed", updated, `Status changed to ${updated.status}`);
-        emitIncidentUpdate(updated);
-        emitTimelineEvent({
-            type: "incident.status_changed",
-            incident: buildIncidentSocketPayload(updated),
-        });
-
-        if (isResolvedTransition) {
-            await saveTimelineEntry("incident.resolved", updated, "Incident resolved");
-            emitTimelineEvent({
-                type: "incident.resolved",
-                incident: buildIncidentSocketPayload(updated),
-            });
-
-            try {
-                // Generate the postmortem immediately so the database stays in sync with the resolved state.
-                await generatePostmortem(updated?._id?.toString?.() || id, req.apiKey._id);
-            } catch (error) {
-                // The incident update must still succeed even if AI generation fails.
-                console.error("[Postmortem] Generation failed:", error.message);
-            }
-        }
-
-        return res.json(new ApiResponse(200, "Incident updated", updated));
+        return res.json(new ApiResponse(200, "Incident status updated", updated));
     } catch (error) {
         next(error);
     }
 };
+
+/**
+ * @description Controller function to update the severity of an incident
+ */
+export const updateIncidentSeverity = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { severity } = req.body;
+        const normalizedSeverity = typeof severity === "string" ? severity.trim().toUpperCase() : "";
+
+        const updated = await updateIncidentSeverityService(id, req.user.organizationId, req.apiKey._id, normalizedSeverity, req.user);
+
+        return res.json(new ApiResponse(200, "Incident severity updated", updated));
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+
