@@ -25,18 +25,25 @@ export const getRedisClient = async () => {
         redisClient = createClient({ 
             url: redisUrl,
             socket: {
-                tls: redisUrl.startsWith("rediss"),
+                tls: redisUrl.startsWith("rediss") ? {
+                    rejectUnauthorized: false // Critical for some cloud environments
+                } : false,
                 reconnectStrategy: (retries) => {
-                    // Exponential backoff with a cap of 5 seconds
-                    const delay = Math.min(retries * 100, 5000);
-                    return delay;
+                    // Start fast, then slow down up to 10 seconds between attempts
+                    return Math.min(retries * 200, 10000);
                 },
-                connectTimeoutMs: 10000, // 10 seconds timeout
-                keepAlive: 10000, // Keep connection alive with 10s interval
-            }
+                connectTimeoutMs: 20000, // 20 seconds for slow cold-starts
+                keepAlive: 30000, // TCP keep-alive
+            },
+            pingInterval: 30000 // Send a PING every 30 seconds to stay alive
         });
 
-        redisClient.on("error", (err) => console.error("[Redis Shared] Error:", err.message));
+        redisClient.on("error", (err) => {
+            console.error("[Redis Shared] Error:", err.message);
+            if (err.message.includes("ECONNRESET") || err.message.includes("timeout")) {
+                console.info("[Redis Shared] Network blip detected. Reconnect logic is active.");
+            }
+        });
         
         await redisClient.connect();
         console.log("[Redis Shared] Connected successfully.");
