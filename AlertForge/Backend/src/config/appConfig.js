@@ -35,6 +35,7 @@ const appConfig = {
     },
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
+    jwtWarRoomSecret: process.env.JWT_WARROOM_SECRET || process.env.JWT_ACCESS_SECRET,
     tavilyApiKey: process.env.TAVILY_API_KEY,
     googleClientId: process.env.CLIENT_ID,
     googleClientSecret: process.env.CLIENT_SECRET,

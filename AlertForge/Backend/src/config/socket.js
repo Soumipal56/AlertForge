@@ -13,6 +13,7 @@ import { getIncidentByIdService } from "../services/incident.service.js";
 import { setupRedisAdapter } from "./redis.adapter.js";
 import { socketConnectionLimiter, throttleSocketEvent, rateLimitConfig } from "../middleware/rateLimiter/index.js";
 import { storeChatInPinecone } from "../services/ai/utils/pinecone.js";
+import { getWarRoomSuggestions } from "../services/ai/suggestion.service.js";
 
 let ioInstance = null;
 
@@ -142,6 +143,17 @@ export const initSocket = async (httpServer) => {
                         messages: recentMessages.reverse().map(toMessagePayload),
                     });
                 }
+
+                // AI Suggestions Trigger
+                if (room.startsWith("incident:")) {
+                    const incidentId = room.split(":")[1];
+                    const incident = await getIncidentByIdService(incidentId, socket.user.apiKeyId);
+                    if (incident) {
+                        getWarRoomSuggestions(incident).then(suggestions => {
+                            socket.emit("room:suggestion", { suggestions });
+                        }).catch(err => console.error("[Socket] Suggestion error:", err.message));
+                    }
+                }
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
                 emitSocketError(socket, "JOIN_ERROR", error.message);
@@ -179,6 +191,11 @@ export const initSocket = async (httpServer) => {
                         status: incident.status,
                     });
                 }
+
+                // AI Suggestions Trigger
+                getWarRoomSuggestions(incident).then(suggestions => {
+                    socket.emit("room:suggestion", { suggestions });
+                }).catch(err => console.error("[Socket] Suggestion error:", err.message));
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
                 emitSocketError(socket, "VALIDATION_ERROR", error.message);
@@ -255,8 +272,9 @@ export const initSocket = async (httpServer) => {
         });
     });
 
-
+    
     return ioInstance;
+
 };
 
 export const getIo = () => ioInstance;

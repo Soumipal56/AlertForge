@@ -1,4 +1,6 @@
 import express from "express"
+import path from "path";
+import { fileURLToPath } from "url";
 import cors from 'cors'
 import morgan from 'morgan'
 import cookieParser from "cookie-parser";
@@ -23,6 +25,9 @@ import warRoomRouter from "./routes/warroom.routes.js";
 import { publicApiLimiter } from "./middleware/rateLimiter/index.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 app.use(morgan('dev'));
 
@@ -39,13 +44,13 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, "../public")));
+
 // Initialize Passport for Google OAuth
 app.use(passport.initialize());
 
 //NOTE -  Routes
-app.get(`/`, (req, res) => {
-    res.send("Welcome to AlertForge API");
-})
 app.use(`/api/auth`, authRouter)
 app.use(`/api/apikeys`, apiKeyRouter)
 app.use(`/api/incidents`, incidentRouter)
@@ -62,6 +67,14 @@ app.use(`/api/warroom`, warRoomRouter)
 
 
 app.use(errorHandler);
+
+// Catch-all route for SPA - serves the frontend for any non-API routes
+app.get("*", (req, res, next) => {
+    if (req.url.startsWith("/api") || req.url.startsWith("/socket.io")) {
+        return next();
+    }
+    res.sendFile(path.join(__dirname, "../public/index.html"));
+});
 
 export default app;
 
