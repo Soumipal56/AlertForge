@@ -1,5 +1,4 @@
 import express from "express";
-import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
 import { authApiLimiter, criticalApiLimiter } from "../middleware/rateLimiter/index.js";
 import { 
     createIncident, 
@@ -14,28 +13,49 @@ import {
 } from "../controller/incident.controller.js";
 import { smartAuth } from "../middleware/smartAuth.middleware.js";
 import { adminOnly, responderOrAbove, anyRole } from "../middleware/rbac.middleware.js";
-
+import { validate } from "../middleware/validation.middleware.js";
+import { incidentSchema } from "../validators/incident.validator.js";
 
 const incidentRouter = express.Router();
 
 incidentRouter.use(smartAuth);
 incidentRouter.use(authApiLimiter);
 
-incidentRouter.post("/", responderOrAbove, createIncident);
-// Alias route specifically for broadcasting
-incidentRouter.post("/broadcast", responderOrAbove, createAndBroadcastIncident);
+// CREATE
+incidentRouter.post("/", 
+    responderOrAbove, 
+    validate(incidentSchema), 
+    createIncident
+);
 
+incidentRouter.post("/broadcast", 
+    responderOrAbove, 
+    validate(incidentSchema), 
+    createAndBroadcastIncident
+);
+
+// READ
 incidentRouter.get("/", anyRole, getAllIncidents);
 incidentRouter.get("/:id", anyRole, getIncidentById);
-incidentRouter.patch("/:id/status", criticalApiLimiter, responderOrAbove, updateIncidentStatus);
-incidentRouter.patch("/:id/severity", criticalApiLimiter, adminOnly, updateIncidentSeverity);
 
-// Timeline routes
-incidentRouter.get("/:id/timeline", getIncidentTimeline);
-incidentRouter.post("/:id/timeline", addTimelineNote);
+// UPDATE
+incidentRouter.patch("/:id/status", 
+    criticalApiLimiter, 
+    responderOrAbove, 
+    updateIncidentStatus
+);
+
+incidentRouter.patch("/:id/severity", 
+    criticalApiLimiter, 
+    adminOnly, 
+    updateIncidentSeverity
+);
+
+// TIMELINE
+incidentRouter.get("/:id/timeline", anyRole, getIncidentTimeline);
+incidentRouter.post("/:id/timeline", responderOrAbove, addTimelineNote);
+
+// AI SUGGESTIONS
 incidentRouter.get("/:id/suggestions", anyRole, getIncidentSuggestionsController);
-
-
-
 
 export default incidentRouter;

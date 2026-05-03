@@ -1,11 +1,20 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const apiKeySchema = new mongoose.Schema({
-    key: {
+    // Searchable prefix (public/non-sensitive)
+    keyId: {
         type: String,
         required: true,
         unique: true,
         index: true,
+    },
+
+    // Securely hashed secret (private/sensitive)
+    hashedKey: {
+        type: String,
+        required: true,
+        select: false,
     },
 
     name: {
@@ -33,6 +42,11 @@ const apiKeySchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// PASSWORD-LIKE VERIFICATION
+apiKeySchema.methods.compareKey = async function (rawKey) {
+    return await bcrypt.compare(rawKey, this.hashedKey);
+};
 
 apiKeySchema.index(
     { user: 1, isActive: 1 },
