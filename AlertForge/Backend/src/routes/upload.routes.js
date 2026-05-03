@@ -2,7 +2,7 @@ import express from "express";
 import { uploadMiddleware } from "../middleware/upload.middleware.js";
 import { handleFileUpload } from "../controller/upload.controller.js";
 import { heavyApiLimiter } from "../middleware/rateLimiter/index.js";
-import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
+import { smartAuth } from "../middleware/smartAuth.middleware.js";
 
 const router = express.Router();
 
@@ -13,8 +13,7 @@ const router = express.Router();
  */
 router.post(
     "/upload",
-    authMiddleware,
-    attachApiKey,
+    smartAuth,
     heavyApiLimiter,
     uploadMiddleware.single("file"),
     handleFileUpload

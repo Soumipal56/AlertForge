@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
-import { 
-    createIncidentDAO, 
-    getAllIncidentsDAO, 
-    getIncidentByIdDAO, 
-    updateIncidentStatusDAO, 
-    getIncidentCountsDAO, 
-    updateIncidentSeverityDAO 
+import {
+    createIncidentDAO,
+    getAllIncidentsDAO,
+    getIncidentByIdDAO,
+    updateIncidentStatusDAO,
+    getIncidentCountsDAO,
+    updateIncidentSeverityDAO
 } from "../dao/incident.dao.js";
 import { incrementServiceIncidentCountDAO } from "../dao/service.dao.js";
 import { syncServiceStatusFromIncidentsService } from "./service.service.js";
@@ -23,7 +23,7 @@ import { broadcastIncidentAlert } from "./notification/notification.service.js";
  */
 export const getAllIncidentsService = async (organizationId, status = "all") => {
     if (!organizationId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Authentication required");
-    
+
     const incidents = await getAllIncidentsDAO(organizationId, status);
     const aggregation = await getIncidentCountsDAO(organizationId);
 
@@ -93,6 +93,8 @@ export const createIncidentService = async (data, user, apiKey) => {
     if (user.organizationId) {
         broadcastIncidentAlert(incident, user.organizationId).catch(console.error);
     }
+    sendIncidentNotification({ incident, user, type: "INCIDENT_CREATED" }).catch(console.error);
+
     syncServiceStatusFromIncidentsService(incident.service, user.organizationId, apiKey._id).catch(console.error);
 
     emitNewIncident(incident);
@@ -152,6 +154,7 @@ export const updateIncidentStatusService = async (id, organizationId, apiKeyId, 
     }
 
     // Post-commit side effects
+    sendIncidentNotification({ incident: updated, user, type: "STATUS_UPDATED" }).catch(console.error);
     syncServiceStatusFromIncidentsService(updated.service, organizationId, apiKeyId).catch(console.error);
 
     emitIncidentUpdate(updated);
@@ -197,6 +200,8 @@ export const updateIncidentSeverityService = async (id, organizationId, apiKeyId
         incident: { id: updated._id, title: updated.title, status: updated.status, severity: updated.severity, service: updated.service },
         metadata: { from: oldSeverity, to: severity }
     });
+
+    sendIncidentNotification({ incident: updated, user, type: "SEVERITY_UPDATED" }).catch(console.error);
 
     return updated;
 };
