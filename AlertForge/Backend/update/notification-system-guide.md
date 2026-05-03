@@ -31,7 +31,37 @@ flowchart TD
 
 ---
 
-## 💬 2. How Telegram Works
+## 🎯 2. Triggers: Which Routes Fire Notifications?
+
+The system does not send notifications randomly. It strictly listens to three specific Incident API endpoints.
+
+To trigger a notification, you must authenticate using **either** of these credentials:
+1. **Dashboard Session Cookie**: `accessToken` (Automatically attached if logged into the dashboard).
+2. **API Key**: `x-api-key: <your_raw_api_key>` (Passed in the headers).
+
+When authenticated, hitting any of the following routes will trigger the notification fan-out:
+
+### A. Creating an Incident
+* **Route:** `POST /api/incidents`
+* **Triggered Type:** `"INCIDENT_CREATED"`
+* **Payload Example:** `{ "title": "DB Down", "service": "payments", "severity": "P1" }`
+* **Result:** Alerts all channels with a "🚨 New Incident Alert" title.
+
+### B. Updating Incident Status
+* **Route:** `PATCH /api/incidents/:id/status`
+* **Triggered Type:** `"STATUS_UPDATED"`
+* **Payload Example:** `{ "status": "Identified" }`
+* **Result:** Alerts all channels with a "🔄 Incident Status Update" title.
+
+### C. Updating Incident Severity
+* **Route:** `PATCH /api/incidents/:id/severity`
+* **Triggered Type:** `"SEVERITY_UPDATED"`
+* **Payload Example:** `{ "severity": "P1" }`
+* **Result:** Alerts all channels with an "⚠️ Incident Severity Update" title.
+
+---
+
+## 💬 3. How Telegram Works
 
 We use the official **Telegram Bot API**.
 
@@ -44,7 +74,7 @@ We use the official **Telegram Bot API**.
 
 ---
 
-## 🎮 3. How Discord Works
+## 🎮 4. How Discord Works
 
 We use **Discord Webhooks**, which do not require a bot token or complex authentication.
 
@@ -57,7 +87,7 @@ We use **Discord Webhooks**, which do not require a bot token or complex authent
 
 ---
 
-## 📧 4. How Email Works
+## 📧 5. How Email Works
 
 We use **Nodemailer** to dispatch HTML-formatted emails.
 
@@ -70,7 +100,7 @@ We use **Nodemailer** to dispatch HTML-formatted emails.
 
 ---
 
-## ⚙️ 5. The Proper Way to Configure It (User Profile)
+## ⚙️ 6. The Proper Way to Configure It (User Profile)
 
 For these notifications to fire, the user must configure their profile properly via the newly hardened **User Model**.
 
@@ -98,7 +128,7 @@ For these notifications to fire, the user must configure their profile properly 
 
 ---
 
-## 🛡️ 6. Why This Architecture is Production-Ready
+## 🛡️ 7. Why This Architecture is Production-Ready
 
 1. **Non-Blocking:** By using `Promise.allSettled()`, sending notifications does not delay the HTTP response sent back to the client.
 2. **Fault-Tolerant:** If the Telegram API goes down, it will reject its specific Promise, but the Discord and Email promises will still execute successfully. One broken channel does not break the others.
