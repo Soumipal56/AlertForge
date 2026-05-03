@@ -127,7 +127,7 @@ export const initSocket = async (httpServer) => {
                 socket.join(room);
                 socket.data.activeRoom = room;
 
-                const count = addUser(room, socket.id);
+                const count = await addUser(room, socket.id);
                 const recentMessages = await getRecentWarRoomMessages(room);
 
                 // Broadcast presence update
@@ -150,6 +150,40 @@ export const initSocket = async (httpServer) => {
         /**
          * @description Leaves a room explicitly
          */
+        socket.on("join_incident_room", async (payload = {}, ack) => {
+            try {
+                const { incidentId } = payload;
+                if (!incidentId) throw new Error("Incident ID is required");
+
+                // Validate incident access using API key ID
+                const incident = await getIncidentByIdService(incidentId, socket.user.apiKeyId);
+                if (!incident) throw new Error("Incident not found or unauthorized");
+
+                const room = normalizeRoomName(`incident:${incidentId}`);
+                socket.join(room);
+                socket.data.activeRoom = room;
+
+                const count = await addUser(room, socket.id);
+                const recentMessages = await getRecentWarRoomMessages(room);
+
+                // Broadcast presence
+                ioInstance.to(room).emit("room:presence", { room, count });
+
+                if (typeof ack === "function") {
+                    ack({
+                        success: true,
+                        room,
+                        count,
+                        messages: recentMessages.reverse().map(toMessagePayload),
+                        status: incident.status,
+                    });
+                }
+            } catch (error) {
+                if (typeof ack === "function") ack({ success: false, message: error.message });
+                emitSocketError(socket, "VALIDATION_ERROR", error.message);
+            }
+        });
+
         socket.on("room:leave", (payload = {}, ack) => {
             const { room } = payload;
             if (room) {
@@ -211,18 +245,20 @@ export const initSocket = async (httpServer) => {
             }
         });
 
-        socket.on("disconnect", () => {
-            const rooms = getRoomsForSocket(socket.id);
-            rooms.forEach((room) => {
-                const count = removeUser(room, socket.id);
-                ioInstance.to(room).emit("presence:update", { room, count, user: socket.user, action: "disconnected" });
-            });
+        socket.on("disconnect", async () => {
+            const rooms = await getRoomsForSocket(socket.id);
+            for (const room of rooms) {
+                const count = await removeUser(room, socket.id);
+                ioInstance.to(room).emit("room:presence", { room, count });
+            }
         });
     });
 
-
+    
     return ioInstance;
+
 };
 
 export const getIo = () => ioInstance;
-export const getRoomPresenceCount = (roomName) => getCount(normalizeRoomName(roomName));
+export const getRoomPresenceCount = async (roomName) => getCount(normalizeRoomName(roomName));
+

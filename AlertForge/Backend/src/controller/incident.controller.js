@@ -97,6 +97,30 @@ export const createIncident = async (req, res, next) => {
     }
 };
 
+export const createAndBroadcastIncident = async (req, res, next) => {
+    try {
+        const data = req.body;
+        const validation = incidentSchema.safeParse(data);
+        if (!validation.success) {
+            throw new ApiError(HTTP_STATUS.BAD_REQUEST, validation.error.errors[0].message);
+        }
+
+        // Pass true for isBroadcast
+        const incident = await createIncidentService(data, req.user, req.apiKey, true);
+        
+        return res
+            .status(HTTP_STATUS.CREATED)
+            .json(new ApiResponse(
+                HTTP_STATUS.CREATED,
+                "Incident created and broadcasted successfully",
+                incident
+            ));
+
+    } catch (error) {
+        next(error);
+    }
+};
+
 /**  
  * @description Controller function to retrieve all incidents for the dashboard
  */

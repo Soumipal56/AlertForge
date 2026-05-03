@@ -3,6 +3,7 @@ export const HTTP_STATUS = {
     CREATED: 201,
     BAD_REQUEST: 400,
     UNAUTHORIZED: 401,
+    FORBIDDEN: 403,
     NOT_FOUND: 404,
     INTERNAL_SERVER: 500,
 };
@@ -48,4 +49,3 @@ export const SEVERITY = {
     P2: "P2",
     P3: "P3",
 };
-

@@ -53,6 +53,14 @@ const incidentSchema = new mongoose.Schema({
         type: String,
         default: "",
     },
+    joinCode: {
+        type: String,
+        default: null,
+    },
+    joinToken: {
+        type: String,
+        default: null,
+    },
     /**
      * Ownership ID (API Key reference) — primary scoping field.
      * Incidents are only accessible by the key that created them.
