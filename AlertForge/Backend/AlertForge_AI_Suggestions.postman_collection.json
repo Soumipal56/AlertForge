@@ -1,0 +1,80 @@
+{
+	"info": {
+		"_postman_id": "8d3e2a7b-3f4c-4e5d-b6a7-c8d9e0f1a2b3",
+		"name": "AlertForge AI Suggestion Engine",
+		"description": "Collection for testing AI suggestions and incident management.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Create Incident",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "x-api-key",
+						"value": "af_12aad9d1fe417ba04a7da1f05957c120de2ec6e4ca2e9961aceb109afad8230c",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"API Key Verification Test\",\n    \"service\": \"Auth-Service\",\n    \"severity\": \"P2\",\n    \"message\": \"Verifying AI suggestions via Postman.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/incidents",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"incidents"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get AI Suggestions",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "x-api-key",
+						"value": "af_12aad9d1fe417ba04a7da1f05957c120de2ec6e4ca2e9961aceb109afad8230c",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/api/incidents/:id/suggestions",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"incidents",
+						":id",
+						"suggestions"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "PASTE_INCIDENT_ID_HERE",
+							"description": "The ID returned from the 'Create Incident' call"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
