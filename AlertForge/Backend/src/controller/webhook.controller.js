@@ -53,9 +53,16 @@ export const uptimerobotWebhook = async (req, res, next) => {
         }
 
         const incident = await createIncidentService(incidentData);
-        
+
+        // ─── DEBUG LOGGING ───────────────────────────────────────────────
+        console.log("[Webhook] Resolved user object:", JSON.stringify(apiKeyDoc.user, null, 2));
+        console.log("[Webhook] Incident created:", incident._id?.toString());
+        // ────────────────────────────────────────────────────────────────
+
         if (apiKeyDoc.user) {
             sendIncidentNotifications(apiKeyDoc.user, incident);
+        } else {
+            console.warn("[Webhook] No user found on apiKeyDoc — notifications skipped!");
         }
 
         emitNewIncident(incident);
