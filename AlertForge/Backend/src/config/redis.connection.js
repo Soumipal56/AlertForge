@@ -26,7 +26,13 @@ export const getRedisClient = async () => {
             url: redisUrl,
             socket: {
                 tls: redisUrl.startsWith("rediss"),
-                reconnectStrategy: (retries) => Math.min(retries * 50, 2000)
+                reconnectStrategy: (retries) => {
+                    // Exponential backoff with a cap of 5 seconds
+                    const delay = Math.min(retries * 100, 5000);
+                    return delay;
+                },
+                connectTimeoutMs: 10000, // 10 seconds timeout
+                keepAlive: 10000, // Keep connection alive with 10s interval
             }
         });
 
