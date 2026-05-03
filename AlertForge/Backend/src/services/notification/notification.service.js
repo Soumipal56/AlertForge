@@ -4,6 +4,8 @@ import { sendTelegramNotification } from "./telegram.service.js";
 import { sendWebhookNotification } from "./webhook.service.js";
 import { getTeamMembersDAO, findUserByIdDAO } from "../../dao/user.dao.js";
 import { buildWarRoomLink, generateWarRoomToken } from "../../utils/warRoomToken.js";
+import logger from "../../utils/logger.js";
+import { retry } from "../../utils/retry.js";
 
 const getIncidentId = (incident) => incident?._id?.toString() || incident?.id?.toString();
 
@@ -13,21 +15,13 @@ const getUniqueRecipients = (recipients) => {
 
 const getUniqueUsers = (users) => {
     const usersById = new Map();
-
     users.filter(Boolean).forEach((user) => {
         const userId = user?._id?.toString() || user?.id?.toString();
         if (userId && !usersById.has(userId)) {
             usersById.set(userId, user);
         }
     });
-
     return Array.from(usersById.values());
-};
-
-const getErrorMessage = (reason) => {
-    if (!reason) return "Unknown error";
-    if (reason instanceof Error) return reason.message;
-    return typeof reason === "string" ? reason : JSON.stringify(reason);
 };
 
 const createIncidentNotificationPayload = (incident, organizationId, type = "INCIDENT_CREATED") => {
@@ -49,42 +43,26 @@ const createIncidentNotificationPayload = (incident, organizationId, type = "INC
     };
 };
 
-const logSettledResults = (channel, targets, results) => {
-    results.forEach((result, index) => {
-        const target = targets[index];
-        if (result.status === "fulfilled") {
-            console.log(`[Notification:${channel}] Sent successfully to ${target}`);
-            return;
-        }
-
-        console.error(`[Notification:${channel}] Failed for ${target}: ${getErrorMessage(result.reason)}`);
-    });
-};
-
 export const sendEmailNotifications = async (user, payload) => {
     const userId = user?._id?.toString() || user?.id || "unknown";
 
     if (user?.notificationSettings?.emailEnabled === false) {
-        console.log(`[Notification:email] Skipped for user ${userId}: email notifications explicitly disabled`);
+        logger.info(`[Notification:email] Skipped for user ${userId}: email notifications explicitly disabled`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
-    const recipients = getUniqueRecipients([
-        user.email,
-        user.emailAddress,
-        ...(user.teamEmails || [])
-    ]);
+    const recipients = getUniqueRecipients([user.email, user.emailAddress, ...(user.teamEmails || [])]);
 
     if (recipients.length === 0) {
-        console.warn(`[Notification:email] Skipped for user ${userId}: no email recipients configured`);
+        logger.warn(`[Notification:email] Skipped for user ${userId}: no email recipients configured`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
     const results = await Promise.allSettled(
-        recipients.map((email) => sendIncidentEmail({ to: email, payload }))
+        recipients.map((email) => 
+            retry(() => sendIncidentEmail({ to: email, payload }), 3, 1000, `Email to ${email}`)
+        )
     );
-
-    logSettledResults("email", recipients, results);
 
     return {
         sent: results.filter((result) => result.status === "fulfilled").length,
@@ -97,25 +75,22 @@ export const sendTelegramNotifications = async (user, payload) => {
     const userId = user?._id?.toString() || user?.id || "unknown";
 
     if (user?.notificationSettings?.telegramEnabled === false) {
-        console.log(`[Notification:telegram] Skipped for user ${userId}: Telegram notifications explicitly disabled`);
+        logger.info(`[Notification:telegram] Skipped for user ${userId}: Telegram notifications explicitly disabled`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
-    const chatIds = getUniqueRecipients([
-        user.telegramChatId,
-        ...(user.telegramChatIds || [])
-    ]);
+    const chatIds = getUniqueRecipients([user.telegramChatId, ...(user.telegramChatIds || [])]);
 
     if (chatIds.length === 0) {
-        console.warn(`[Notification:telegram] Skipped for user ${userId}: no Telegram chat IDs configured`);
+        logger.warn(`[Notification:telegram] Skipped for user ${userId}: no Telegram chat IDs configured`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
     const results = await Promise.allSettled(
-        chatIds.map((chatId) => sendTelegramNotification({ chatId, payload }))
+        chatIds.map((chatId) => 
+            retry(() => sendTelegramNotification({ chatId, payload }), 3, 1000, `Telegram to ${chatId}`)
+        )
     );
-
-    logSettledResults("telegram", chatIds, results);
 
     return {
         sent: results.filter((result) => result.status === "fulfilled").length,
@@ -128,25 +103,22 @@ export const sendDiscordNotifications = async (user, payload) => {
     const userId = user?._id?.toString() || user?.id || "unknown";
 
     if (user?.notificationSettings?.discordEnabled === false) {
-        console.log(`[Notification:discord] Skipped for user ${userId}: Discord notifications explicitly disabled`);
+        logger.info(`[Notification:discord] Skipped for user ${userId}: Discord notifications explicitly disabled`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
-    const webhooks = getUniqueRecipients([
-        user.discordWebhookUrl,
-        ...(user.discordWebhookUrls || [])
-    ]);
+    const webhooks = getUniqueRecipients([user.discordWebhookUrl, ...(user.discordWebhookUrls || [])]);
 
     if (webhooks.length === 0) {
-        console.warn(`[Notification:discord] Skipped for user ${userId}: no Discord webhook URLs configured`);
+        logger.warn(`[Notification:discord] Skipped for user ${userId}: no Discord webhook URLs configured`);
         return { sent: 0, failed: 0, skipped: true };
     }
 
     const results = await Promise.allSettled(
-        webhooks.map((webhookUrl) => sendWebhookNotification({ webhookUrl, payload }))
+        webhooks.map((webhookUrl) => 
+            retry(() => sendWebhookNotification({ webhookUrl, payload }), 3, 1000, `Discord Webhook`)
+        )
     );
-
-    logSettledResults("discord", webhooks, results);
 
     return {
         sent: results.filter((result) => result.status === "fulfilled").length,
@@ -160,7 +132,7 @@ export const sendIncidentNotifications = async (user, incident, type = "INCIDENT
     const payload = options.payload || createIncidentNotificationPayload(incident, organizationId, type);
     const userId = user?._id?.toString() || user?.id || "unknown";
 
-    console.log(`[Notification] Broadcasting ${payload.type} to user ${userId} for incident ${payload.incidentId}`);
+    logger.info(`[Notification] Broadcasting ${payload.type} to user ${userId} for incident ${payload.incidentId}`);
 
     const channels = [
         { name: "email", run: () => sendEmailNotifications(user, payload) },
@@ -171,24 +143,14 @@ export const sendIncidentNotifications = async (user, incident, type = "INCIDENT
     if (user?.preferences?.whatsappEnabled && user?.whatsappNumber) {
         channels.push({
             name: "whatsapp",
-            run: () => sendWhatsApp({
+            run: () => retry(() => sendWhatsApp({
                 message: `${payload.title}. Join War Room: ${payload.warRoomLink}`,
                 dynamicNumber: user.whatsappNumber
-            })
+            }), 3, 1000, `WhatsApp to ${user.whatsappNumber}`)
         });
     }
 
     const results = await Promise.allSettled(channels.map((channel) => channel.run()));
-
-    results.forEach((result, index) => {
-        const channelName = channels[index].name;
-        if (result.status === "fulfilled") {
-            console.log(`[Notification:${channelName}] Completed for user ${userId}`);
-            return;
-        }
-
-        console.error(`[Notification:${channelName}] Error for user ${userId}: ${getErrorMessage(result.reason)}`);
-    });
 
     return {
         userId,
@@ -199,40 +161,26 @@ export const sendIncidentNotifications = async (user, incident, type = "INCIDENT
 };
 
 export const broadcastIncident = async (incident, organizationId, type = "INCIDENT_CREATED") => {
-    console.log(`[Broadcast] Fetching users for organization: ${organizationId}`);
+    logger.info(`[Broadcast] Initiating ${type} for organization: ${organizationId}`);
 
     const [adminUser, teamMembers] = await Promise.all([
         findUserByIdDAO(organizationId),
         getTeamMembersDAO(organizationId)
     ]);
 
-    const allUsers = getUniqueUsers([
-        adminUser,
-        ...(teamMembers || [])
-    ]);
+    const allUsers = getUniqueUsers([adminUser, ...(teamMembers || [])]);
 
     if (allUsers.length === 0) {
-        console.warn("[Broadcast] No users found for organization.");
+        logger.warn("[Broadcast] No users found for organization.");
         return { incidentId: getIncidentId(incident), users: [] };
     }
 
     const payload = createIncidentNotificationPayload(incident, organizationId, type);
-    console.log(`[Broadcast] Initiating ${type} notifications for ${allUsers.length} members`);
-    console.log(`[Broadcast] War room link generated for incident ${payload.incidentId}: ${payload.warRoomLink}`);
-
+    
+    // Process notifications in parallel for all users
     const results = await Promise.allSettled(
         allUsers.map((user) => sendIncidentNotifications(user, incident, type, { payload, organizationId }))
     );
-
-    results.forEach((result, index) => {
-        const userId = allUsers[index]?._id?.toString() || allUsers[index]?.id || "unknown";
-        if (result.status === "fulfilled") {
-            console.log(`[Broadcast] Notifications completed for user ${userId}`);
-            return;
-        }
-
-        console.error(`[Broadcast] Notifications failed for user ${userId}: ${getErrorMessage(result.reason)}`);
-    });
 
     return {
         incidentId: payload.incidentId,
@@ -241,13 +189,7 @@ export const broadcastIncident = async (incident, organizationId, type = "INCIDE
     };
 };
 
-export const broadcastIncidentAlert = broadcastIncident;
-
 export const sendIncidentNotification = async ({ incident, user, type }) => {
-    if (!user) {
-        console.warn("[NotificationService] No user provided. Skipping.");
-        return;
-    }
-
+    if (!user) return;
     await sendIncidentNotifications(user, incident, type);
 };

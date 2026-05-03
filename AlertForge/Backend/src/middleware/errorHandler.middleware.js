@@ -1,16 +1,39 @@
-import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants.js";
+import logger from "../utils/logger.js";
+import { HTTP_STATUS, ERROR_MESSAGES } from "../config/constants.js";
 
+/**
+ * Global Error Handler Middleware
+ * Standardizes all error responses across the API.
+ */
 export const errorHandler = (err, req, res, next) => {
-    console.error(err); // Log the error for debugging  
+    let { statusCode, message, errorCode, details } = err;
 
-    if (err.statusCode) {
-        return res.status(err.statusCode).json({
-            success: false,
-            message: err.message,
-        });
-    }
-    return res.status(HTTP_STATUS.INTERNAL_SERVER).json({
+    // Default values for unexpected errors
+    if (!statusCode) statusCode = HTTP_STATUS.INTERNAL_SERVER || 500;
+    if (!message) message = ERROR_MESSAGES.GENERAL.INTERNAL_SERVER || "Something went wrong";
+    
+    const response = {
         success: false,
-        message: ERROR_MESSAGES.GENERAL.INTERNAL_SERVER,
+        message,
+        errorCode: errorCode || 'INTERNAL_ERROR',
+        details: details || {},
+        requestId: req.headers['x-request-id'] || 'N/A'
+    };
+
+    // Log the error using structured logger
+    logger.error(message, {
+        statusCode,
+        errorCode,
+        stack: err.stack,
+        url: req.originalUrl,
+        method: req.method,
+        requestId: response.requestId
     });
+
+    // Don't leak stack trace in production
+    if (process.env.NODE_ENV !== 'production') {
+        response.stack = err.stack;
+    }
+
+    return res.status(statusCode).json(response);
 };

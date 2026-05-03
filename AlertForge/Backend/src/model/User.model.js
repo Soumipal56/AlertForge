@@ -1,7 +1,10 @@
 import mongoose from "mongoose";
 
+import bcrypt from "bcryptjs";
+
 // FEATURE-8/10: User model with RBAC roles and team membership
 const userSchema = new mongoose.Schema({
+    // ... existing fields ...
     email: {
         type: String,
         unique: true,
@@ -32,14 +35,11 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    // FEATURE-10: RBAC — admin creates org, responder handles incidents, viewer is read-only
     role: {
         type: String,
         enum: ["admin", "responder", "viewer"],
         default: "admin",
     },
-    // The owning admin's userId — for multi-tenant team scoping
-    // Admin's own userId will match _id; team members will have the admin's id here
     organizationId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -49,12 +49,6 @@ const userSchema = new mongoose.Schema({
     teamEmails: {
         type: [String],
         default: [],
-        validate: {
-            validator: function(emails) {
-                return emails.every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
-            },
-            message: "Invalid email format in teamEmails"
-        }
     },
     telegramChatId: {
         type: String,
@@ -63,33 +57,28 @@ const userSchema = new mongoose.Schema({
     discordWebhookUrl: {
         type: String,
         default: null,
-        validate: {
-            validator: function(url) {
-                if (!url) return true;
-                return url.startsWith("https://discord.com/api/webhooks/");
-            },
-            message: "Invalid Discord webhook URL"
-        }
     },
     notificationSettings: {
-        emailEnabled: {
-            type: Boolean,
-            default: true
-        },
-        telegramEnabled: {
-            type: Boolean,
-            default: false
-        },
-        discordEnabled: {
-            type: Boolean,
-            default: false
-        }
+        emailEnabled: { type: Boolean, default: true },
+        telegramEnabled: { type: Boolean, default: false },
+        discordEnabled: { type: Boolean, default: false }
     }
 }, {
     timestamps: true
 });
 
-const userModel = mongoose.model("User", userSchema);
+// PASSWORD HASHING
+userSchema.pre("save", async function (next) {
+    if (!this.isModified("password")) return next();
+    this.password = await bcrypt.hash(this.password, 12);
+    next();
+});
 
+// PASSWORD VERIFICATION
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
+};
+
+const userModel = mongoose.model("User", userSchema);
 export default userModel;
 

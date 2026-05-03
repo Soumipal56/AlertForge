@@ -78,9 +78,14 @@ const incidentSchema = new mongoose.Schema({
         index: true,
     }
 }, {
-
     timestamps: true
 });
+
+// COMPOUND INDEXES for production-grade performance
+incidentSchema.index({ apiKeyId: 1, status: 1 });
+incidentSchema.index({ organizationId: 1, createdAt: -1 });
+incidentSchema.index({ service: 1, status: 1 });
+incidentSchema.index({ organizationId: 1, service: 1 });
 
 /**
  * Backward-compat sync: ensure title ↔ message are always both populated.
