@@ -30,7 +30,8 @@ export const throttleSocketEvent = async (socket, event, options) => {
         multi.expire(key, windowSeconds, "NX"); // Only set expire if key doesn't exist
         
         const results = await multi.exec();
-        const currentCount = results[0];
+        // ioredis returns [[err, res], [err, res]]
+        const currentCount = results[0][1];
 
         if (currentCount > limit) {
             console.warn(`[Socket RateLimit] '${event}' blocked for ${identifier} (${currentCount}/${limit})`);

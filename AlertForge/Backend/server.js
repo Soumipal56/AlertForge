@@ -4,6 +4,7 @@ import app from "./src/app.js";
 import appConfig from "./src/config/appConfig.js";
 import connectDB from "./src/config/db.js";
 import { initSocket } from "./src/config/socket.js";
+import { getRedisClient } from "./src/config/redis.connection.js";
 
 /**
  * PRODUCTION-READY SERVER BOOTSTRAP
@@ -47,6 +48,13 @@ const startServer = async () => {
                 try {
                     await mongoose.connection.close();
                     console.log("[Database] MongoDB connection closed.");
+                    
+                    const redisClient = await getRedisClient();
+                    if (redisClient) {
+                        await redisClient.quit();
+                        console.log("[Redis] Connection closed gracefully.");
+                    }
+
                     process.exit(0);
                 } catch (err) {
                     console.error("[Error] Failure during DB shutdown:", err.message);

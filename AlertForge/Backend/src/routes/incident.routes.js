@@ -9,7 +9,8 @@ import {
     updateIncidentStatus, 
     updateIncidentSeverity,
     getIncidentTimeline,
-    addTimelineNote
+    addTimelineNote,
+    getIncidentSuggestionsController
 } from "../controller/incident.controller.js";
 import { smartAuth } from "../middleware/smartAuth.middleware.js";
 import { adminOnly, responderOrAbove, anyRole } from "../middleware/rbac.middleware.js";
@@ -32,6 +33,7 @@ incidentRouter.patch("/:id/severity", criticalApiLimiter, adminOnly, updateIncid
 // Timeline routes
 incidentRouter.get("/:id/timeline", getIncidentTimeline);
 incidentRouter.post("/:id/timeline", addTimelineNote);
+incidentRouter.get("/:id/suggestions", anyRole, getIncidentSuggestionsController);
 
 
 

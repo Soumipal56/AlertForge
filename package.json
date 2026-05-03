@@ -1,0 +1,11 @@
+{
+  "name": "alertforge-deploy-proxy",
+  "version": "1.0.0",
+  "description": "Proxy for Render deployment",
+  "main": "AlertForge/Backend/server.js",
+  "scripts": {
+    "start": "npm start --prefix AlertForge/Backend",
+    "build": "npm install --prefix AlertForge/Backend",
+    "install": "npm install --prefix AlertForge/Backend"
+  }
+}

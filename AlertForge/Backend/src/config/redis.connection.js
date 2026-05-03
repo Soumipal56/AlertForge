@@ -1,13 +1,8 @@
-import { createClient } from "redis";
+import Redis from "ioredis";
 import appConfig from "./appConfig.js";
 
 /**
- * SHARED REDIS RESP CLIENT (TCP/SSL)
- * 
- * Used for:
- * 1. Socket.IO Redis Adapter
- * 2. Distributed Rate Limiting (Redis Store)
- * 3. High-performance Pub/Sub operations
+ * SHARED REDIS RESP CLIENT (TCP/SSL) using ioredis
  */
 let redisClient = null;
 
@@ -22,18 +17,27 @@ export const getRedisClient = async () => {
     }
 
     try {
-        redisClient = createClient({ 
-            url: redisUrl,
-            socket: {
-                tls: redisUrl.startsWith("rediss"),
-                reconnectStrategy: (retries) => Math.min(retries * 50, 2000)
-            }
+        // Using the structure you requested
+        redisClient = new Redis(redisUrl, {
+            tls: {
+                rejectUnauthorized: false
+            },
+            // Additional stability options
+            retryStrategy: (times) => {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            },
+            maxRetriesPerRequest: null, // Keep retrying
+            enableReadyCheck: true
         });
 
-        redisClient.on("error", (err) => console.error("[Redis Shared] Error:", err.message));
-        
-        await redisClient.connect();
-        console.log("[Redis Shared] Connected successfully.");
+        redisClient.on("error", (err) => {
+            console.error("[Redis Shared] Error:", err.message);
+        });
+
+        redisClient.on("connect", () => {
+            console.log("[Redis Shared] Connected successfully.");
+        });
         
         return redisClient;
     } catch (error) {

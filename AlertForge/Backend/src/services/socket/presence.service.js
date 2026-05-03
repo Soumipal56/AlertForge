@@ -76,14 +76,14 @@ export const addUser = async (room, socketId) => {
     try {
         // Add socketId to the room's SET, and room to the socket's SET (for cleanup on disconnect)
         await Promise.all([
-            redis.sAdd(roomKey(room), socketId),
-            redis.sAdd(socketKey(socketId), room),
+            redis.sadd(roomKey(room), socketId),
+            redis.sadd(socketKey(socketId), room),
             redis.expire(roomKey(room), PRESENCE_TTL_SECONDS),
             redis.expire(socketKey(socketId), PRESENCE_TTL_SECONDS),
         ]);
 
         // SCARD returns the exact count across all instances — this is the truth
-        const count = await redis.sCard(roomKey(room));
+        const count = await redis.scard(roomKey(room));
         return count;
     } catch (err) {
         console.error("[Presence] Redis addUser failed, using fallback:", err.message);
@@ -107,11 +107,11 @@ export const removeUser = async (room, socketId) => {
 
     try {
         await Promise.all([
-            redis.sRem(roomKey(room), socketId),
-            redis.sRem(socketKey(socketId), room),
+            redis.srem(roomKey(room), socketId),
+            redis.srem(socketKey(socketId), room),
         ]);
 
-        const count = await redis.sCard(roomKey(room));
+        const count = await redis.scard(roomKey(room));
 
         // Clean up empty room key
         if (count === 0) {
@@ -139,7 +139,7 @@ export const getCount = async (room) => {
     }
 
     try {
-        return await redis.sCard(roomKey(room));
+        return await redis.scard(roomKey(room));
     } catch (err) {
         console.error("[Presence] Redis getCount failed, using fallback:", err.message);
         return fallbackGetCount(room);
@@ -161,7 +161,7 @@ export const getRoomsForSocket = async (socketId) => {
     }
 
     try {
-        const rooms = await redis.sMembers(socketKey(socketId));
+        const rooms = await redis.smembers(socketKey(socketId));
 
         // Clean up the socket's room-tracking key
         await redis.del(socketKey(socketId));

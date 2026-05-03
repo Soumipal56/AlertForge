@@ -9,6 +9,7 @@ import {
     getTimelineEventsByIncidentService,
     createTimelineEventService
 } from "../services/timeline/timeline.service.js";
+import { getWarRoomSuggestions } from "../services/ai/suggestion.service.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { incidentSchema } from "../validators/incident.validator.js";
@@ -201,4 +202,22 @@ export const updateIncidentSeverity = async (req, res, next) => {
 
 
 
+/**
+ * @description Controller function to get AI-driven suggestions for an incident
+ */
+export const getIncidentSuggestionsController = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const incident = await getIncidentByIdService(id, req.user.organizationId);
+
+        if (!incident) {
+            throw new ApiError(404, "Incident not found");
+        }
+
+        const suggestions = await getWarRoomSuggestions(incident);
+        return res.json(new ApiResponse(200, "AI Suggestions generated", { suggestions }));
+    } catch (error) {
+        next(error);
+    }
+};
 

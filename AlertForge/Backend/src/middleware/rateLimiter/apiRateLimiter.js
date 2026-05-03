@@ -14,7 +14,7 @@ import { rateLimitConfig } from "./config.js";
 const redis = await getRedisClient();
 
 const store = redis ? new RedisStore({
-    sendCommand: (...args) => redis.sendCommand(args),
+    sendCommand: (...args) => redis.call(...args),
     prefix: "rl:api:", // Unique prefix for API rate limits
 }) : undefined; // Fallback to memory store if Redis is unavailable
 
