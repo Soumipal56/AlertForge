@@ -145,3 +145,51 @@ export const removeTeamMember = async (req, res, next) => {
         next(error);
     }
 };
+/**
+ * POST /api/team/resend-invite
+ * Resends the invitation email to a pending member.
+ */
+export const resendInvite = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        if (!email) throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email is required");
+
+        const user = await findUserByEmailDAO(email);
+        if (!user) throw new ApiError(HTTP_STATUS.NOT_FOUND, "User not found");
+
+        const inviter = await findUserByIdDAO(req.user.organizationId);
+        const inviterName = inviter?.name || "Your Team Lead";
+
+        await sendInviteEmail({
+            to: user.email,
+            name: user.name,
+            temporaryPassword: "AlertForge123!", // Standard default for now
+            invitedBy: inviterName,
+        });
+
+        return res.json(new ApiResponse(HTTP_STATUS.OK, "Invitation resent"));
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * DELETE /api/team/revoke-invite/:email
+ * Revokes an invitation by deleting the user record.
+ */
+export const revokeInvite = async (req, res, next) => {
+    try {
+        const { email } = req.params;
+        const user = await findUserByEmailDAO(email);
+        
+        if (!user) throw new ApiError(HTTP_STATUS.NOT_FOUND, "Invitation not found");
+        if (user.organizationId.toString() !== req.user.organizationId.toString()) {
+            throw new ApiError(HTTP_STATUS.FORBIDDEN, "Unauthorized to revoke this invitation");
+        }
+
+        await removeTeamMemberDAO(user._id, req.user.organizationId);
+        return res.json(new ApiResponse(HTTP_STATUS.OK, "Invitation revoked"));
+    } catch (error) {
+        next(error);
+    }
+};

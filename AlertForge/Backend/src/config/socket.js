@@ -85,6 +85,8 @@ export const initSocket = async (httpServer) => {
             socket.user = {
                 organizationId: foundKey.user._id?.toString(), // Added for message scoping
                 apiKeyId: foundKey._id?.toString(),
+                userId: foundKey.user?._id?.toString(),
+                organizationId: foundKey.user?.organizationId?.toString() || foundKey.user?._id?.toString(),
                 serviceName: foundKey.serviceName,
                 name: typeof name === "string" && name.trim() ? name.trim() : `User-${socket.id.slice(0, 4)}`,
             };
@@ -119,7 +121,7 @@ export const initSocket = async (httpServer) => {
                     room = normalizeRoomName(socket.user.serviceName);
                 } else if (roomType === "incident") {
                     if (!id) throw new Error("Incident ID required");
-                    const incident = await getIncidentByIdService(id, socket.user.apiKeyId); // Note: still using apiKeyId here for SDK compatibility
+                    const incident = await getIncidentByIdService(id, socket.user.organizationId); 
                     if (!incident) throw new Error("Incident not found/unauthorized");
                     room = normalizeRoomName(`incident:${id}`);
                 } else {
@@ -168,8 +170,8 @@ export const initSocket = async (httpServer) => {
                 const { incidentId } = payload;
                 if (!incidentId) throw new Error("Incident ID is required");
 
-                // Validate incident access using API key ID
-                const incident = await getIncidentByIdService(incidentId, socket.user.apiKeyId);
+                // Validate incident access using Organization ID
+                const incident = await getIncidentByIdService(incidentId, socket.user.organizationId);
                 if (!incident) throw new Error("Incident not found or unauthorized");
 
                 const room = normalizeRoomName(`incident:${incidentId}`);

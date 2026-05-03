@@ -8,6 +8,8 @@ import {
     inviteTeamMember,
     updateTeamMemberRole,
     removeTeamMember,
+    resendInvite,
+    revokeInvite,
 } from "../controller/team.controller.js";
 
 const teamRouter = express.Router();
@@ -20,11 +22,13 @@ teamRouter.get("/members", authApiLimiter, adminOnly, getTeamMembers);
 
 // POST invite — admin only
 teamRouter.post("/invite", criticalApiLimiter, adminOnly, inviteTeamMember);
+teamRouter.post("/resend-invite", criticalApiLimiter, adminOnly, resendInvite);
 
 // PATCH role — admin only
 teamRouter.patch("/role", criticalApiLimiter, adminOnly, updateTeamMemberRole);
 
 // DELETE member — admin only
 teamRouter.delete("/member/:id", criticalApiLimiter, adminOnly, removeTeamMember);
+teamRouter.delete("/revoke-invite/:email", criticalApiLimiter, adminOnly, revokeInvite);
 
 export default teamRouter;

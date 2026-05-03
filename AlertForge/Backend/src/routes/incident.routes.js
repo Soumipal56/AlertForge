@@ -12,6 +12,7 @@ import {
     addTimelineNote
 } from "../controller/incident.controller.js";
 import { smartAuth } from "../middleware/smartAuth.middleware.js";
+import { adminOnly, responderOrAbove, anyRole } from "../middleware/rbac.middleware.js";
 
 
 const incidentRouter = express.Router();
@@ -19,14 +20,14 @@ const incidentRouter = express.Router();
 incidentRouter.use(smartAuth);
 incidentRouter.use(authApiLimiter);
 
-incidentRouter.post("/", createIncident);
+incidentRouter.post("/", responderOrAbove, createIncident);
 // Alias route specifically for broadcasting
-incidentRouter.post("/broadcast", createAndBroadcastIncident);
+incidentRouter.post("/broadcast", responderOrAbove, createAndBroadcastIncident);
 
-incidentRouter.get("/", getAllIncidents);
-incidentRouter.get("/:id", getIncidentById);
-incidentRouter.patch("/:id/status", criticalApiLimiter, updateIncidentStatus);
-incidentRouter.patch("/:id/severity", criticalApiLimiter, updateIncidentSeverity);
+incidentRouter.get("/", anyRole, getAllIncidents);
+incidentRouter.get("/:id", anyRole, getIncidentById);
+incidentRouter.patch("/:id/status", criticalApiLimiter, responderOrAbove, updateIncidentStatus);
+incidentRouter.patch("/:id/severity", criticalApiLimiter, adminOnly, updateIncidentSeverity);
 
 // Timeline routes
 incidentRouter.get("/:id/timeline", getIncidentTimeline);

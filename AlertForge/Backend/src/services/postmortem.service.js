@@ -205,3 +205,44 @@ export const updatePostmortemService = async (incidentId, apiKeyId, updates) => 
     return postmortem;
 };
 
+/**
+ * FEATURE: Exports a postmortem to a structured Markdown format.
+ */
+export const exportPostmortemService = async (incidentId, apiKeyId) => {
+    const postmortem = await getPostmortemByIncidentIdService(incidentId, apiKeyId);
+    if (!postmortem) {
+        throw new ApiError(404, "Postmortem not found");
+    }
+
+    const incident = await incidentModel.findById(incidentId).lean();
+
+    let md = `# Postmortem: ${incident?.title || "Incident " + incidentId}\n\n`;
+    md += `**Severity:** ${incident?.severity}\n`;
+    md += `**Service:** ${incident?.service}\n`;
+    md += `**Status:** ${incident?.status}\n`;
+    md += `**Started At:** ${incident?.startedAt}\n`;
+    md += `**Resolved At:** ${incident?.resolvedAt}\n\n`;
+
+    md += `## Summary\n${postmortem.summary}\n\n`;
+    md += `## Root Cause\n${postmortem.rootCause}\n\n`;
+    md += `## Contributing Factors\n${postmortem.contributingFactors.map(f => `- ${f}`).join("\n")}\n\n`;
+    
+    md += `## Action Items\n`;
+    postmortem.actionItems.forEach(item => {
+        md += `- [${item.status === 'done' ? 'x' : ' '}] **${item.task}** (Owner: ${item.owner}, Deadline: ${item.deadline.toDateString()})\n`;
+    });
+    md += `\n`;
+
+    md += `## Learnings\n${postmortem.learnings}\n\n`;
+    md += `## Debugging Timeline\n${postmortem.debuggingTimeline}\n\n`;
+
+    if (postmortem.externalKnowledge?.summary) {
+        md += `## AI External Intelligence\n${postmortem.externalKnowledge.summary}\n\n`;
+        md += `### Sources\n${postmortem.externalKnowledge.sources.map(s => `- [${s.title}](${s.url})`).join("\n")}\n`;
+    }
+
+    return {
+        filename: `postmortem-${incidentId}.md`,
+        content: md
+    };
+};

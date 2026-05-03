@@ -89,7 +89,7 @@ export const deleteServiceService = async (serviceId, organizationId) => {
 /**
  * ARCHITECTURE HARDENING: Automated status sync based on incident load.
  */
-import { getIncidentStatsByServiceDAO } from "../dao/incident.dao.js";
+import { getIncidentStatsByServiceDAO, getIncidentDurationsByServiceDAO } from "../dao/incident.dao.js";
 
 export const syncServiceStatusFromIncidentsService = async (serviceName, organizationId, apiKeyId) => {
     try {
@@ -100,9 +100,27 @@ export const syncServiceStatusFromIncidentsService = async (serviceName, organiz
         else if (stats.monitoring > 0) newStatus = "degraded";
 
         await updateServiceStatusDAO(null, organizationId, newStatus, serviceName); 
+        
+        // Also trigger uptime recalc
+        await calculateUptimeService(serviceName, organizationId);
+        
         return newStatus;
     } catch (error) {
         console.error("[Service Sync] Failed to sync status:", error.message);
+    }
+};
+
+export const calculateUptimeService = async (serviceName, organizationId) => {
+    try {
+        const totalOutageDurationMs = await getIncidentDurationsByServiceDAO(serviceName, organizationId, 30);
+        const totalTimeMs = 30 * 24 * 60 * 60 * 1000;
+        
+        const uptimePercent = Math.max(0, Math.min(100, 100 - (totalOutageDurationMs / totalTimeMs) * 100));
+        
+        await updateServiceDAO(null, organizationId, { uptimePercent }, serviceName);
+        return uptimePercent;
+    } catch (error) {
+        console.error("[Uptime Calc] Failed:", error.message);
     }
 };
 

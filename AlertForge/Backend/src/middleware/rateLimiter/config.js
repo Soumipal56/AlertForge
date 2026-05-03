@@ -21,7 +21,7 @@ export const rateLimitConfig = {
         },
         critical: {
             windowMs: 60 * 1000, // 1 minute
-            max: 4,            // 10 requests burst protection
+            max: 20,            // 10 requests burst protection
             message: { success: false, message: "Critical operation rate limit hit. Please try again later." }
         },
         heavy: {

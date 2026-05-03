@@ -48,9 +48,13 @@ export const updateServiceStatusDAO = async (serviceId, organizationId, status, 
 /**
  * Updates arbitrary service fields (for PATCH requests).
  */
-export const updateServiceDAO = async (serviceId, organizationId, updates) => {
+export const updateServiceDAO = async (serviceId, organizationId, updates, serviceName = null) => {
+    const filter = { organizationId };
+    if (serviceId) filter._id = serviceId;
+    if (serviceName) filter.name = serviceName;
+
     return await serviceModel.findOneAndUpdate(
-        { _id: serviceId, organizationId },
+        filter,
         { $set: updates },
         { returnDocument: "after", runValidators: true }
     ).lean();

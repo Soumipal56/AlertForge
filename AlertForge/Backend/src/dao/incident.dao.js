@@ -103,3 +103,35 @@ export const getIncidentStatsByServiceDAO = async (serviceName, organizationId) 
     return stats;
 };
 
+/**
+ * Returns sum of durations of resolved incidents for a service in the last X days.
+ */
+export const getIncidentDurationsByServiceDAO = async (serviceName, organizationId, days = 30) => {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const results = await incidentModel.aggregate([
+        {
+            $match: {
+                service: serviceName,
+                organizationId: new mongoose.Types.ObjectId(organizationId),
+                status: INCIDENT_STATUS.RESOLVED,
+                resolvedAt: { $gte: startDate }
+            }
+        },
+        {
+            $project: {
+                duration: { $subtract: ["$resolvedAt", "$startedAt"] }
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalDuration: { $sum: "$duration" }
+            }
+        }
+    ]);
+
+    return results.length > 0 ? results[0].totalDuration : 0;
+};
+
