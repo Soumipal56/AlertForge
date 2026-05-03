@@ -9,6 +9,7 @@ import {
 } from "../config/cookieOptions.js";
 import { findUserByIdDAO } from "../dao/user.dao.js";
 import appConfig from "../config/appConfig.js";
+import { blacklistToken, isTokenBlacklisted } from "../services/redis/tokenBlacklist.service.js";
 
 export const register = async (req, res, next) => {
     try {
@@ -21,6 +22,10 @@ export const register = async (req, res, next) => {
             success: true,
             message: "User registered successfully",
             apiKey,
+            data: {
+                accessToken,
+                refreshToken
+            }
         });
     } catch (error) {
         next(error);
@@ -41,7 +46,9 @@ export const login = async (req, res, next) => {
                 user: {
                     id: user._id,
                     email: user.email,
-                }
+                },
+                accessToken,
+                refreshToken
             }
         });
     } catch (error) {
@@ -52,7 +59,12 @@ export const login = async (req, res, next) => {
 
 export const refresh = async (req, res, next) => {
     try {
-        const accessToken = await refreshAccessTokenService(req.cookies?.refreshToken);
+        const refreshToken = req.cookies?.refreshToken;
+        if (refreshToken && await isTokenBlacklisted(refreshToken)) {
+            throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Refresh token invalidated - please login again");
+        }
+
+        const accessToken = await refreshAccessTokenService(refreshToken);
 
         res.cookie("accessToken", accessToken, accessTokenCookieOptions);
 
@@ -66,6 +78,19 @@ export const refresh = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
     try {
+        const accessToken = req.cookies?.accessToken;
+        const refreshToken = req.cookies?.refreshToken;
+
+        // Blacklist current tokens if they exist
+        if (accessToken) {
+            // Access tokens usually expire in 15m (900s)
+            await blacklistToken(accessToken, 900);
+        }
+        if (refreshToken) {
+            // Refresh tokens usually expire in 7d
+            await blacklistToken(refreshToken, 7 * 24 * 60 * 60);
+        }
+
         res.clearCookie("accessToken", authCookieOptions);
         res.clearCookie("refreshToken", authCookieOptions);
 
@@ -117,7 +142,7 @@ export const googleLogin = (req, res, next) => {
 // Get current authenticated user
 export const getMe = async (req, res, next) => {
     try {
-        const user = await findUserByIdDAO(req.user.userId);
+        const user = await findUserByIdDAO(req.user.id);
         if (!user) {
             return res.status(HTTP_STATUS.NOT_FOUND).json(
                 new ApiResponse(HTTP_STATUS.NOT_FOUND, "User not found")

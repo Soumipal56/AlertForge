@@ -32,8 +32,8 @@ export const updateUserProfileService = async (userId, payload) => {
         throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Discord webhook URL is required when Discord notifications are enabled.");
     }
     
-    if (mergedSettings.emailEnabled && (!mergedTeamEmails || mergedTeamEmails.length === 0)) {
-        throw new ApiError(HTTP_STATUS.BAD_REQUEST, "At least one team email is required when Email notifications are enabled.");
+    if (mergedSettings.emailEnabled && (!mergedTeamEmails || mergedTeamEmails.length === 0) && !currentUser.email) {
+        throw new ApiError(HTTP_STATUS.BAD_REQUEST, "An email address is required when Email notifications are enabled.");
     }
 
     // 5. Call DAO

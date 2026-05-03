@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import appConfig from "../config/appConfig.js";
 
 const assertSecret = (secret, name) => {
@@ -9,12 +10,14 @@ const assertSecret = (secret, name) => {
 
 export const generateAccessToken = (userId) => {
     assertSecret(appConfig.jwtAccessSecret, "JWT_ACCESS_SECRET");
-    return jwt.sign({ userId }, appConfig.jwtAccessSecret, { expiresIn: "15m" });
+    const jti = crypto.randomBytes(16).toString("hex");
+    return jwt.sign({ userId, jti }, appConfig.jwtAccessSecret, { expiresIn: "15m" });
 };
 
 export const generateRefreshToken = (userId) => {
     assertSecret(appConfig.jwtRefreshSecret, "JWT_REFRESH_SECRET");
-    return jwt.sign({ userId }, appConfig.jwtRefreshSecret, { expiresIn: "7d" });
+    const jti = crypto.randomBytes(16).toString("hex");
+    return jwt.sign({ userId, jti }, appConfig.jwtRefreshSecret, { expiresIn: "7d" });
 };
 
 export const verifyAccessToken = (token) => {
