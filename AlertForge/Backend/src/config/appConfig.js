@@ -41,6 +41,7 @@ const appConfig = {
     googleClientSecret: process.env.CLIENT_SECRET,
     googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL,
     frontendUrl: process.env.FRONTEND_URL,
+    brevoApiKey: process.env.BREVO_API_KEY,
 };
 
 export default appConfig;
