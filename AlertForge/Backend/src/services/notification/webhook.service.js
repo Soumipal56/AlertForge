@@ -1,17 +1,22 @@
-export const sendWebhookNotification = async (data, dynamicUrl = null) => {
+export const sendWebhookNotification = async (data, dynamicUrl = null, type = "INCIDENT_CREATED") => {
     const webhookUrl = dynamicUrl || process.env.WEBHOOK_URL;
     if (!webhookUrl) return;
 
     try {
+        const titleText = type === "INCIDENT_CREATED" ? "🚨 New Incident Created" : 
+                          type === "STATUS_UPDATED" ? "🔄 Incident Status Update" : 
+                          "⚠️ Incident Severity Update";
+
         const payload = {
             embeds: [{
-                title: "🚨 New Incident Created",
-                color: 0xFF0000,
+                title: titleText,
+                color: type === "INCIDENT_CREATED" ? 0xFF0000 : (type === "STATUS_UPDATED" ? 0x00FF00 : 0xFFA500),
                 fields: [
                     { name: "📌 Service",     value: data.service || "N/A",     inline: true },
                     { name: "⚡ Status",      value: data.status || "N/A",      inline: true },
                     { name: "🔴 Severity",    value: data.severity || "N/A",    inline: true },
-                    { name: "📝 Message",     value: data.message || "N/A",     inline: false },
+                    { name: "📝 Title",       value: data.title || data.message || "N/A", inline: false },
+
                 ],
                 footer: { text: "AlertForge Incident Management" },
                 timestamp: new Date().toISOString()

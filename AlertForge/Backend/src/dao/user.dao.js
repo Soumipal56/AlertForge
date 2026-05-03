@@ -85,3 +85,14 @@ export const updateUserDAO = async (id, updates) => {
 export const updateUserByIdDAO = async (id, updates) => {
     return await userModel.findByIdAndUpdate(id, { $set: updates }, { returnDocument: "after", new: true }).lean();
 };
+
+/**
+ * Updates a user's notification preferences and profile.
+ */
+export const updateUserProfileDAO = async (userId, updateData) => {
+    return await userModel.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true, runValidators: true }
+    ).select("-password").lean();
+};

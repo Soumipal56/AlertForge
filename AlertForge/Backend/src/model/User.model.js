@@ -46,51 +46,44 @@ const userSchema = new mongoose.Schema({
         default: null,
         index: true,
     },
-    teamEmails: [
-        {
-            type: String,
-            lowercase: true,
-            trim: true,
+    teamEmails: {
+        type: [String],
+        default: [],
+        validate: {
+            validator: function(emails) {
+                return emails.every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+            },
+            message: "Invalid email format in teamEmails"
         }
-    ],
+    },
     telegramChatId: {
         type: String,
-        default: null,
+        default: null
     },
-    telegramChatIds: [
-        {
-            type: String,
-            trim: true,
-        }
-    ],
     discordWebhookUrl: {
         type: String,
         default: null,
-    },
-    discordWebhookUrls: [
-        {
-            type: String,
-            trim: true,
+        validate: {
+            validator: function(url) {
+                if (!url) return true;
+                return url.startsWith("https://discord.com/api/webhooks/");
+            },
+            message: "Invalid Discord webhook URL"
         }
-    ],
-    whatsappNumber: {
-        type: String,
-        default: null,
-    },
-    emailAddress: {
-        type: String,
-        default: null,
-    },
-    preferences: {
-        emailEnabled: { type: Boolean, default: true },
-        telegramEnabled: { type: Boolean, default: false },
-        webhookEnabled: { type: Boolean, default: false },
-        whatsappEnabled: { type: Boolean, default: false },
     },
     notificationSettings: {
-        emailEnabled: { type: Boolean, default: true },
-        discordEnabled: { type: Boolean, default: false },
-        telegramEnabled: { type: Boolean, default: false }
+        emailEnabled: {
+            type: Boolean,
+            default: true
+        },
+        telegramEnabled: {
+            type: Boolean,
+            default: false
+        },
+        discordEnabled: {
+            type: Boolean,
+            default: false
+        }
     }
 }, {
     timestamps: true

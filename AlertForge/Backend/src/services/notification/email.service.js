@@ -10,16 +10,25 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const sendIncidentEmail = async ({ to, subject, message }) => {
+export const sendIncidentEmail = async ({ to, subject, message, incident, type = "INCIDENT_CREATED" }) => {
     try {
+        const titlePrefix = type === "INCIDENT_CREATED" ? "🚨 New Incident Alert" : 
+                            type === "STATUS_UPDATED" ? "🔄 Incident Status Update" : 
+                            "⚠️ Incident Severity Update";
+
+        const emailSubject = subject || `${titlePrefix} - ${incident?.service || "AlertForge"}`;
+        
         await transporter.sendMail({
             from: `"AlertForge" <${appConfig.EMAIL_USER}>`,
             to,
-            subject: subject || "🚨 Incident Alert",
+            subject: emailSubject,
             html: `
         <div style="font-family: sans-serif; border: 1px solid #eee; padding: 20px;">
-          <h2 style="color: #d32f2f;">🚨 Incident Alert</h2>
-          <p><b>Message:</b> ${message}</p>
+          <h2 style="color: #d32f2f;">${titlePrefix}</h2>
+          <p><b>Title:</b> ${incident?.title || incident?.message || "N/A"}</p>
+          <p><b>Service:</b> ${incident?.service || "N/A"}</p>
+          <p><b>Severity:</b> ${incident?.severity || "N/A"}</p>
+          <p><b>Status:</b> ${incident?.status || "N/A"}</p>
           <hr />
           <p style="font-size: 12px; color: #777;">AlertForge Automated System</p>
         </div>
