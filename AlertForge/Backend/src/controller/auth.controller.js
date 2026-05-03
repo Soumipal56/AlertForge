@@ -9,6 +9,7 @@ import {
 } from "../config/cookieOptions.js";
 import { findUserByIdDAO } from "../dao/user.dao.js";
 import appConfig from "../config/appConfig.js";
+import { blacklistToken, isTokenBlacklisted } from "../services/redis/tokenBlacklist.service.js";
 
 export const register = async (req, res, next) => {
     try {
@@ -58,7 +59,12 @@ export const login = async (req, res, next) => {
 
 export const refresh = async (req, res, next) => {
     try {
-        const accessToken = await refreshAccessTokenService(req.cookies?.refreshToken);
+        const refreshToken = req.cookies?.refreshToken;
+        if (refreshToken && await isTokenBlacklisted(refreshToken)) {
+            throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Refresh token invalidated - please login again");
+        }
+
+        const accessToken = await refreshAccessTokenService(refreshToken);
 
         res.cookie("accessToken", accessToken, accessTokenCookieOptions);
 
@@ -72,6 +78,19 @@ export const refresh = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
     try {
+        const accessToken = req.cookies?.accessToken;
+        const refreshToken = req.cookies?.refreshToken;
+
+        // Blacklist current tokens if they exist
+        if (accessToken) {
+            // Access tokens usually expire in 15m (900s)
+            await blacklistToken(accessToken, 900);
+        }
+        if (refreshToken) {
+            // Refresh tokens usually expire in 7d
+            await blacklistToken(refreshToken, 7 * 24 * 60 * 60);
+        }
+
         res.clearCookie("accessToken", authCookieOptions);
         res.clearCookie("refreshToken", authCookieOptions);
 
