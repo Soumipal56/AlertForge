@@ -10,13 +10,20 @@ import logger from "../utils/logger.js";
 const httpClient = async (options = {}) => {
     const { baseURL, accessToken, apiKey } = getConfig();
 
+    const headers = {
+        "Content-Type": "application/json",
+    };
+
+    // Prioritize User Session (JWT) over API Key for hybrid flows
+    if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+    } else if (apiKey) {
+        headers["x-api-key"] = apiKey;
+    }
+
     const instance = axios.create({
         baseURL,
-        headers: {
-            "Content-Type": "application/json",
-            ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
-            ...(apiKey && { "x-api-key": apiKey }),
-        },
+        headers,
     });
 
     try {

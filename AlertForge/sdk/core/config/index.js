@@ -39,6 +39,10 @@ export const setAccessToken = (token) => {
     config.accessToken = token;
 };
 
+export const clearAccessToken = () => {
+    config.accessToken = null;
+};
+
 export const getConfig = () => ({ ...config });
 
 export default config;

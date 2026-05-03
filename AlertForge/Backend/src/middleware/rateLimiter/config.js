@@ -16,7 +16,7 @@ export const rateLimitConfig = {
         },
         auth: {
             windowMs: 60 * 1000, // 1 minute
-            max: 5,           // 200 requests
+            max: isProd ? 5 : 1000,           // 200 requests in prod, 1000 in dev
             message: { success: false, message: "API key rate limit exceeded. Please slow down." }
         },
         critical: {

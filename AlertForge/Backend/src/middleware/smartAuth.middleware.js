@@ -6,7 +6,9 @@ import { hashKey } from "../utils/hashKey.js";
 
 export const smartAuth = async (req, res, next) => {
     try {
-        const accessToken = req.cookies?.accessToken;
+        const authHeader = req.headers["authorization"];
+        const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+        const accessToken = req.cookies?.accessToken || bearerToken;
         const apiKeyHeader = req.headers["x-api-key"];
 
         // Debug Logs (Temporary)

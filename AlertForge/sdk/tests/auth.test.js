@@ -7,7 +7,7 @@ export const testAuth = async () => {
     
     try {
         // 1. Test Login
-        const loginRes = await auth.login("test@alertforge.com", "AlertForge123!");
+        const loginRes = await auth.login("admin@test.com", "pass123");
         if (loginRes.success) {
             logger.info("✔ Login successful");
         } else {
@@ -16,7 +16,7 @@ export const testAuth = async () => {
 
         // 2. Test Get Me
         const meRes = await auth.getMe();
-        if (meRes.data?.email === "test@alertforge.com") {
+        if (meRes.data?.email === "admin@test.com") {
             logger.info("✔ Fetch profile successful");
         }
 

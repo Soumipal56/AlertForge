@@ -1,5 +1,7 @@
 import { Server } from "socket.io";
 import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
+import { findUserByIdDAO } from "../dao/user.dao.js";
+import { verifyAccessToken } from "../utils/token.js";
 import { hashKey } from "../utils/hashKey.js";
 import {
     getRecentWarRoomMessages,
@@ -68,38 +70,53 @@ export const initSocket = async (httpServer) => {
      */
     ioInstance.use(async (socket, next) => {
         try {
-            const { apiKey, name } = socket.handshake.auth;
+            const { apiKey, token, name } = socket.handshake.auth;
 
-            if (!apiKey) {
-                return next(new Error("Unauthorized: API Key is required"));
+            if (apiKey) {
+                const hashed = hashKey(apiKey);
+                const foundKey = await findActiveApiKeyByHashedKeyDAO(hashed);
+
+                if (!foundKey) {
+                    return next(new Error("Unauthorized: Invalid or inactive API Key"));
+                }
+
+                socket.user = {
+                    organizationId: foundKey.user?.organizationId?.toString() || foundKey.user?._id?.toString(),
+                    apiKeyId: foundKey._id?.toString(),
+                    userId: foundKey.user?._id?.toString(),
+                    serviceName: foundKey.serviceName,
+                    name: typeof name === "string" && name.trim() ? name.trim() : `User-${socket.id.slice(0, 4)}`,
+                };
+                
+                socket.data.apiKey = { id: foundKey._id?.toString(), name: foundKey.name, serviceName: foundKey.serviceName };
+                socket.data.user = socket.user;
+                return next();
             }
 
-            const hashed = hashKey(apiKey);
-            const foundKey = await findActiveApiKeyByHashedKeyDAO(hashed);
+            if (token) {
+                try {
+                    const decoded = verifyAccessToken(token);
+                    if (!decoded?.userId) throw new Error("Invalid token");
 
-            if (!foundKey) {
-                return next(new Error("Unauthorized: Invalid or inactive API Key"));
+                    // For JWT flow, we still need the orgId and other metadata
+                    // We'll fetch a default API key or just the user record
+                    const user = await findUserByIdDAO(decoded.userId);
+                    if (!user) throw new Error("User not found");
+
+                    socket.user = {
+                        organizationId: user.organizationId?.toString() || user._id?.toString(),
+                        userId: user._id?.toString(),
+                        name: user.name || `User-${socket.id.slice(0, 4)}`,
+                        role: user.role
+                    };
+                    socket.data.user = socket.user;
+                    return next();
+                } catch (err) {
+                    return next(new Error("Unauthorized: Invalid or expired token"));
+                }
             }
 
-            // Attach validated user info to the socket
-            socket.user = {
-                organizationId: foundKey.user._id?.toString(), // Added for message scoping
-                apiKeyId: foundKey._id?.toString(),
-                userId: foundKey.user?._id?.toString(),
-                organizationId: foundKey.user?.organizationId?.toString() || foundKey.user?._id?.toString(),
-                serviceName: foundKey.serviceName,
-                name: typeof name === "string" && name.trim() ? name.trim() : `User-${socket.id.slice(0, 4)}`,
-            };
-
-            // Keep socket.data for internal compatibility if needed
-            socket.data.apiKey = {
-                id: foundKey._id?.toString(),
-                name: foundKey.name,
-                serviceName: foundKey.serviceName,
-            };
-            socket.data.user = socket.user;
-
-            return next();
+            return next(new Error("Unauthorized: Authentication required"));
         } catch (err) {
             console.error("[Socket Auth] Middleware error:", err.message);
             return next(new Error("Unauthorized: Internal server error"));

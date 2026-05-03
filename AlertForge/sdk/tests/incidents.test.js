@@ -8,9 +8,10 @@ export const testIncidents = async () => {
     try {
         // 1. Create Incident
         const newIncident = await incidents.createIncident({
-            message: "Test Incident from SDK",
+            title: "Test Incident from SDK",
+            message: "This is a detailed test message",
             service: "SDK Test Service",
-            severity: "medium"
+            severity: "P2"
         });
         const incidentId = newIncident.data?.id || newIncident.data?._id;
         if (incidentId) {

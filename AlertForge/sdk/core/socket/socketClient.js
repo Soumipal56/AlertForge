@@ -9,7 +9,7 @@ let socketInstance = null;
  * Socket.io client wrapper for AlertForge.
  */
 export const connectSocket = (apiKeyOverride = null) => {
-    const { socketURL, apiKey } = getConfig();
+    const { socketURL, apiKey, accessToken } = getConfig();
     const finalKey = apiKeyOverride || apiKey;
 
     if (socketInstance?.connected) {
@@ -24,6 +24,7 @@ export const connectSocket = (apiKeyOverride = null) => {
         reconnectionDelay: 2000,
         auth: {
             apiKey: finalKey,
+            token: accessToken,
         },
     });
 
