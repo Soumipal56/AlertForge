@@ -27,24 +27,28 @@ const normalizeGoogleProfile = (profile) => {
 };
 
 // Configure Google OAuth 2.0 Strategy
-passport.use(
-    new GoogleStrategy(
-        {
-            clientID: appConfig.googleClientId,
-            clientSecret: appConfig.googleClientSecret,
-            callbackURL: appConfig.googleCallbackUrl,
-        },
-        (accessToken, refreshToken, profile, done) => {
-            try {
-                const userData = normalizeGoogleProfile(profile);
-                // Pass clean user data to the controller via done(null, userData)
-                return done(null, userData);
-            } catch (error) {
-                return done(error, null);
+if (appConfig.googleClientId && appConfig.googleClientSecret) {
+    passport.use(
+        new GoogleStrategy(
+            {
+                clientID: appConfig.googleClientId,
+                clientSecret: appConfig.googleClientSecret,
+                callbackURL: appConfig.googleCallbackUrl,
+            },
+            (accessToken, refreshToken, profile, done) => {
+                try {
+                    const userData = normalizeGoogleProfile(profile);
+                    // Pass clean user data to the controller via done(null, userData)
+                    return done(null, userData);
+                } catch (error) {
+                    return done(error, null);
+                }
             }
-        }
-    )
-);
+        )
+    );
+} else {
+    console.warn("[Passport] Google OAuth credentials missing. Strategy not initialized.");
+}
 
 // Serialize user (store user data in session - but we're not using sessions)
 passport.serializeUser((user, done) => {

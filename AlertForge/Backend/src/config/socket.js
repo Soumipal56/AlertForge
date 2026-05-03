@@ -82,6 +82,7 @@ export const initSocket = async (httpServer) => {
 
             // Attach validated user info to the socket
             socket.user = {
+                organizationId: foundKey.user._id?.toString(), // Added for message scoping
                 apiKeyId: foundKey._id?.toString(),
                 serviceName: foundKey.serviceName,
                 name: typeof name === "string" && name.trim() ? name.trim() : `User-${socket.id.slice(0, 4)}`,
@@ -128,7 +129,7 @@ export const initSocket = async (httpServer) => {
                 socket.data.activeRoom = room;
 
                 const count = await addUser(room, socket.id);
-                const recentMessages = await getRecentWarRoomMessages(room);
+                const recentMessages = await getRecentWarRoomMessages(room, socket.user.organizationId);
 
                 // Broadcast presence update
                 ioInstance.to(room).emit("presence:update", { room, count, user: socket.user });
@@ -164,7 +165,7 @@ export const initSocket = async (httpServer) => {
                 socket.data.activeRoom = room;
 
                 const count = await addUser(room, socket.id);
-                const recentMessages = await getRecentWarRoomMessages(room);
+                const recentMessages = await getRecentWarRoomMessages(room, socket.user.organizationId);
 
                 // Broadcast presence
                 ioInstance.to(room).emit("room:presence", { room, count });
@@ -181,6 +182,9 @@ export const initSocket = async (httpServer) => {
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
                 emitSocketError(socket, "VALIDATION_ERROR", error.message);
+            }
+        });
+
         socket.on("room:leave", (payload = {}, ack) => {
             const { room } = payload;
             if (room) {

@@ -1,7 +1,12 @@
 import { createWarRoomMessageDAO, getRecentWarRoomMessagesDAO } from "../../dao/warRoomMessage.dao.js";
+import redis from "../../config/redis.client.js";
 import { storeChatInPinecone } from "../ai/utils/pinecone.js";
 
-const MAX_MESSAGE_LENGTH = 500;
+// ----- Redis cache helpers -----
+const CHAT_RECENT_CACHE_KEY = (roomId, limit) => `chat:recent:${roomId}:${limit}`;
+const RECENT_CHAT_TTL_SECONDS = 300; // 5 minutes
+const MAX_MESSAGE_LENGTH = 500; // characters
+// --------------------------------
 
 /**
  * Normalizes the room id derived from the API key metadata.
@@ -75,6 +80,7 @@ export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, 
 
     const message = await createWarRoomMessageDAO({
         roomId,
+        organizationId: user.organizationId,
         content: validation.value || "",
         fileUrl,
         fileType,
@@ -83,13 +89,10 @@ export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, 
 
     console.log("[DB] Chat saved successfully");
 
-    // Store asynchronously to avoid blocking the main chat flow
-    console.log("[Pinecone] Storing chat vector");
-    storeChatInPinecone([message], roomId).then(() => {
-        // Success is logged inside storeChatInPinecone
-    }).catch(err => {
-        console.error("[Pinecone] Chat store failed:", err.message);
-    });
+    // Invalidate recent messages cache for this room (default limit 50)
+    const redisClient = redis;
+    const recentCacheKey = CHAT_RECENT_CACHE_KEY(roomId, 50);
+    redisClient.del(recentCacheKey).catch(err => console.error("[Redis] Cache invalidation error:", err));
     
     return message;
 };
@@ -100,6 +103,6 @@ export const saveMessage = async ({ roomId, content, fileUrl, fileType, apiKey, 
  * @param {number} limit
  * @returns {Promise<Array>}
  */
-export const getRecentMessages = async (roomId, limit = 50) => {
-    return await getRecentWarRoomMessagesDAO(roomId, limit);
+export const getRecentMessages = async (roomId, organizationId, limit = 50) => {
+    return await getRecentWarRoomMessagesDAO(roomId, organizationId, limit);
 };
