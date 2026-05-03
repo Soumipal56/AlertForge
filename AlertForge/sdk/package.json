@@ -1,6 +1,6 @@
 {
-  "name": "@alertforge/sdk",
-  "version": "1.0.0",
+  "name": "alertforge-sdk",
+  "version": "1.0.2",
   "description": "Stateless Node.js SDK for AlertForge Incident Management",
   "main": "./src/index.js",
   "type": "module",

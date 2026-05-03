@@ -18,7 +18,7 @@ AlertForge uses a stateless API Key authentication model. You do not need to man
 ## 🚀 Installation
 
 ```bash
-npm install @alertforge/sdk
+npm install alertforge-sdk
 ```
 
 ---
