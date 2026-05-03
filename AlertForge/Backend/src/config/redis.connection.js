@@ -1,13 +1,8 @@
-import { createClient } from "redis";
+import Redis from "ioredis";
 import appConfig from "./appConfig.js";
 
 /**
- * SHARED REDIS RESP CLIENT (TCP/SSL)
- * 
- * Used for:
- * 1. Socket.IO Redis Adapter
- * 2. Distributed Rate Limiting (Redis Store)
- * 3. High-performance Pub/Sub operations
+ * SHARED REDIS RESP CLIENT (TCP/SSL) using ioredis
  */
 let redisClient = null;
 
@@ -22,32 +17,27 @@ export const getRedisClient = async () => {
     }
 
     try {
-        // Fix: If URL starts with rediss://, node-redis v4+ might conflict with explicit tls options.
-        // We strip the 's' and manually enable the TLS socket.
-        const normalizedUrl = redisUrl.replace("rediss://", "redis://");
-
-        redisClient = createClient({ 
-            url: normalizedUrl,
-            socket: {
-                tls: redisUrl.startsWith("rediss"), // Manually enable TLS
-                reconnectStrategy: (retries) => {
-                    return Math.min(retries * 200, 10000);
-                },
-                connectTimeoutMs: 20000,
-                keepAlive: 30000,
+        // Using the structure you requested
+        redisClient = new Redis(redisUrl, {
+            tls: {
+                rejectUnauthorized: false
             },
-            pingInterval: 30000
+            // Additional stability options
+            retryStrategy: (times) => {
+                const delay = Math.min(times * 50, 2000);
+                return delay;
+            },
+            maxRetriesPerRequest: null, // Keep retrying
+            enableReadyCheck: true
         });
 
         redisClient.on("error", (err) => {
             console.error("[Redis Shared] Error:", err.message);
-            if (err.message.includes("ECONNRESET") || err.message.includes("timeout")) {
-                console.info("[Redis Shared] Network blip detected. Reconnect logic is active.");
-            }
         });
-        
-        await redisClient.connect();
-        console.log("[Redis Shared] Connected successfully.");
+
+        redisClient.on("connect", () => {
+            console.log("[Redis Shared] Connected successfully.");
+        });
         
         return redisClient;
     } catch (error) {
