@@ -166,7 +166,7 @@ export const initSocket = async (httpServer) => {
                 // AI Suggestions Trigger
                 if (room.startsWith("incident:")) {
                     const incidentId = room.split(":")[1];
-                    const incident = await getIncidentByIdService(incidentId, socket.user.apiKeyId);
+                    const incident = await getIncidentByIdService(incidentId, socket.user.organizationId);
                     if (incident) {
                         getWarRoomSuggestions(incident).then(suggestions => {
                             socket.emit("room:suggestion", { suggestions });
