@@ -11,7 +11,6 @@
 
 **AlertForge** is a production-grade incident management and response orchestration platform. Designed for modern engineering teams, it bridges the gap between infrastructure monitoring and actionable resolution. With AI-driven postmortems, real-time collaboration "War Rooms," and multi-channel notifications, AlertForge ensures your team spends less time panic-searching and more time resolving.
 
-[Explore Docs](./docs) • [View Backend Blueprint](./Backend/update/ARCHITECTURE.md) • [SDK Reference](./sdk)
 
 </div>
 
