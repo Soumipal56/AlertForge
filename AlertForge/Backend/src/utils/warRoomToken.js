@@ -8,8 +8,8 @@ const assertWarRoomTokenInputs = ({ incidentId, organizationId }) => {
     if (!organizationId) {
         throw new Error("Organization ID is required to generate a war-room token");
     }
-    if (!appConfig.jwtAccessSecret) {
-        throw new Error("JWT_ACCESS_SECRET is required to generate a war-room token");
+    if (!appConfig.jwtWarRoomSecret) {
+        throw new Error("JWT_WARROOM_SECRET or JWT_ACCESS_SECRET is required to generate a war-room token");
     }
 };
 
@@ -22,9 +22,26 @@ export const generateWarRoomToken = ({ incidentId, organizationId }) => {
             organizationId: organizationId.toString(),
             scope: "warroom:join"
         },
-        appConfig.jwtAccessSecret,
+        appConfig.jwtWarRoomSecret,
         { expiresIn: "7d" }
     );
+};
+
+export const verifyWarRoomToken = (token) => {
+    if (!token) {
+        throw new Error("War-room join token is required");
+    }
+    if (!appConfig.jwtWarRoomSecret) {
+        throw new Error("JWT_WARROOM_SECRET or JWT_ACCESS_SECRET is required to verify a war-room token");
+    }
+
+    const payload = jwt.verify(token, appConfig.jwtWarRoomSecret);
+
+    if (!payload?.incidentId || !payload?.organizationId || payload.scope !== "warroom:join") {
+        throw new Error("Invalid war-room token payload");
+    }
+
+    return payload;
 };
 
 export const buildWarRoomLink = ({ incidentId, token }) => {
