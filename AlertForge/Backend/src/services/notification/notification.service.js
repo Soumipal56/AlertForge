@@ -77,24 +77,41 @@ export const sendTelegramNotifications = async (user, incident, warRoomLink) => 
  */
 export const sendDiscordNotifications = async (user, incident, warRoomLink) => {
     try {
-        if (!user.notificationSettings?.discordEnabled) return;
+        // ─── DEBUG LOGGING ───────────────────────────────────────────────
+        console.log("[Discord] Entering sendDiscordNotifications");
+        console.log("[Discord] notificationSettings:", JSON.stringify(user.notificationSettings));
+        console.log("[Discord] discordWebhookUrl:", user.discordWebhookUrl);
+        console.log("[Discord] discordWebhookUrls:", user.discordWebhookUrls);
+        // ────────────────────────────────────────────────────────────────
+
+        if (!user.notificationSettings?.discordEnabled) {
+            console.warn("[Discord] Skipped — discordEnabled is false or missing");
+            return;
+        }
 
         const webhooks = getUniqueRecipients([
             user.discordWebhookUrl,
             ...(user.discordWebhookUrls || [])
         ]);
 
-        if (webhooks.length === 0) return;
+        console.log("[Discord] Final webhook list:", webhooks);
+
+        if (webhooks.length === 0) {
+            console.warn("[Discord] Skipped — no webhook URLs found on user");
+            return;
+        }
 
         const message = `🚨 Incident Alert\nMessage: ${incident.message}\nService: ${incident.service}\nSeverity: ${incident.severity}\nJoin: ${warRoomLink}`;
 
-        const discordPromises = webhooks.map(url => 
+        const discordPromises = webhooks.map(url =>
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: message })
             }).then(res => {
+                console.log(`[Discord] Response status for ${url}:`, res.status);
                 if (!res.ok) throw new Error(`Status ${res.status}`);
+                console.log(`[Discord] ✅ Successfully sent to ${url}`);
             })
         );
 
@@ -115,6 +132,8 @@ export const sendDiscordNotifications = async (user, incident, warRoomLink) => {
 export const sendIncidentNotifications = async (user, incident) => {
     const incidentId = incident._id?.toString() || incident.id;
     const warRoomLink = `http://localhost:5173/warroom/${incidentId}`;
+
+    console.log("[Notification] Firing notifications for user:", user._id?.toString() || user.id);
 
     // Execute all channels in parallel
     await Promise.allSettled([

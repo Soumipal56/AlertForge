@@ -118,7 +118,7 @@ export const initSocket = async (httpServer) => {
                 socket.join(room);
                 socket.data.activeRoom = room;
 
-                const count = addUser(room, socket.id);
+                const count = await addUser(room, socket.id);
                 const recentMessages = await getRecentWarRoomMessages(room);
 
                 // Broadcast presence
@@ -154,7 +154,7 @@ export const initSocket = async (httpServer) => {
                 socket.join(room);
                 socket.data.activeRoom = room;
 
-                const count = addUser(room, socket.id);
+                const count = await addUser(room, socket.id);
                 const recentMessages = await getRecentWarRoomMessages(room);
 
                 // Broadcast presence
@@ -212,12 +212,12 @@ export const initSocket = async (httpServer) => {
             }
         });
 
-        socket.on("disconnect", () => {
-            const rooms = getRoomsForSocket(socket.id);
-            rooms.forEach((room) => {
-                const count = removeUser(room, socket.id);
+        socket.on("disconnect", async () => {
+            const rooms = await getRoomsForSocket(socket.id);
+            for (const room of rooms) {
+                const count = await removeUser(room, socket.id);
                 ioInstance.to(room).emit("room:presence", { room, count });
-            });
+            }
         });
     });
 
@@ -225,4 +225,5 @@ export const initSocket = async (httpServer) => {
 };
 
 export const getIo = () => ioInstance;
-export const getRoomPresenceCount = (roomName) => getCount(normalizeRoomName(roomName));
+export const getRoomPresenceCount = async (roomName) => getCount(normalizeRoomName(roomName));
+
