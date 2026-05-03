@@ -17,8 +17,12 @@ AlertForge uses a stateless API Key authentication model. You do not need to man
 
 ## 🚀 Installation
 
+> [!NOTE]
+> The SDK is currently in development and **not yet published to npm**. To use it, copy the `sdk` folder into your project and import it locally.
+
 ```bash
-npm install alertforge-sdk
+# Don't run this yet!
+# npm install alertforge-sdk
 ```
 
 ---
@@ -28,11 +32,28 @@ npm install alertforge-sdk
 ### Initialization
 
 ```javascript
-import { AlertForge } from "@alertforge/sdk";
+import { AlertForge } from "./sdk/index.js"; // Adjust path if local
 
 const af = new AlertForge({
   apiKey: "af_your_secret_key",
   baseURL: "https://alertforge.onrender.com" // Optional: defaults to production
+});
+```
+
+### ⚠️ IMPORTANT: Setup Notifications First
+Before creating your first incident, you **MUST** update your profile to configure where notifications should be sent. This ensures that when an incident is broadcast, you actually receive the alerts.
+
+```javascript
+await af.updateProfile({
+  name: "On-Call Engineer",
+  teamEmails: ["alerts@company.com"],
+  discordWebhookUrl: "https://discord.com/api/webhooks/...",
+  telegramChatId: "987654321",
+  notificationSettings: {
+    emailEnabled: true,
+    discordEnabled: true,
+    telegramEnabled: true
+  }
 });
 ```
 
@@ -65,23 +86,6 @@ console.log("Incidents:", response.data.incidents);
 await af.updateIncidentStatus("incident_id", "resolved");
 ```
 
-### User Profile & Notifications ! important so that we can send notification to you
-
-Configure where you want to receive your alerts.
-
-```javascript
-await af.updateProfile({
-  name: "On-Call Engineer",
-  teamEmails: ["alerts@company.com"],
-  discordWebhookUrl: "https://discord.com/api/webhooks/...",
-  telegramChatId: "987654321",
-  notificationSettings: {
-    emailEnabled: true,
-    discordEnabled: true,
-    telegramEnabled: true
-  }
-});
-```
 
 ### AI Postmortem
 
