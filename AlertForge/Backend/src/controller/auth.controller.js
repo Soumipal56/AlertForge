@@ -11,6 +11,7 @@ import { findUserByIdDAO } from "../dao/user.dao.js";
 import appConfig from "../config/appConfig.js";
 import { blacklistToken, isTokenBlacklisted } from "../services/redis/tokenBlacklist.service.js";
 
+
 export const register = async (req, res, next) => {
     try {
         const { apiKey, accessToken, refreshToken } = await registerService(req.body || {});
