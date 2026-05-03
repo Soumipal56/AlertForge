@@ -1,23 +1,40 @@
 import nodemailer from "nodemailer";
 import appConfig from "../../config/appConfig.js";
 
-
 const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: appConfig.EMAIL_USER,
-    pass: appConfig.EMAIL_PASS,
-  },
+    service: "gmail",
+    auth: {
+        user: appConfig.EMAIL_USER,
+        pass: appConfig.EMAIL_PASS,
+    },
 });
 
-export const sendIncidentEmail = async ({ to, subject, message, incident, type = "INCIDENT_CREATED" }) => {
-    try {
-        const titlePrefix = type === "INCIDENT_CREATED" ? "🚨 New Incident Alert" : 
-                            type === "STATUS_UPDATED" ? "🔄 Incident Status Update" : 
-                            "⚠️ Incident Severity Update";
+const getTitlePrefix = (type) => {
+    if (type === "INCIDENT_CREATED") return "New Incident Alert";
+    if (type === "STATUS_UPDATED") return "Incident Status Update";
+    return "Incident Severity Update";
+};
 
-        const emailSubject = subject || `${titlePrefix} - ${incident?.service || "AlertForge"}`;
-        
+const fallbackPayload = (incident, type) => ({
+    type,
+    title: incident?.title || incident?.message || "N/A",
+    service: incident?.service || "N/A",
+    severity: incident?.severity || "N/A",
+    status: incident?.status || "N/A",
+    incidentId: incident?._id?.toString() || incident?.id?.toString() || "N/A",
+    warRoomLink: null
+});
+
+export const sendIncidentEmail = async ({ to, subject, payload, incident, type = "INCIDENT_CREATED" }) => {
+    try {
+        if (!appConfig.EMAIL_USER || !appConfig.EMAIL_PASS) {
+            throw new Error("EMAIL_USER and EMAIL_PASS are required for SMTP email notifications");
+        }
+
+        const notificationPayload = payload || fallbackPayload(incident, type);
+        const titlePrefix = getTitlePrefix(notificationPayload.type);
+        const emailSubject = subject || `${titlePrefix} - ${notificationPayload.service || "AlertForge"}`;
+
         await transporter.sendMail({
             from: `"AlertForge" <${appConfig.EMAIL_USER}>`,
             to,
@@ -25,10 +42,12 @@ export const sendIncidentEmail = async ({ to, subject, message, incident, type =
             html: `
         <div style="font-family: sans-serif; border: 1px solid #eee; padding: 20px;">
           <h2 style="color: #d32f2f;">${titlePrefix}</h2>
-          <p><b>Title:</b> ${incident?.title || incident?.message || "N/A"}</p>
-          <p><b>Service:</b> ${incident?.service || "N/A"}</p>
-          <p><b>Severity:</b> ${incident?.severity || "N/A"}</p>
-          <p><b>Status:</b> ${incident?.status || "N/A"}</p>
+          <p><b>Title:</b> ${notificationPayload.title}</p>
+          <p><b>Service:</b> ${notificationPayload.service}</p>
+          <p><b>Severity:</b> ${notificationPayload.severity}</p>
+          <p><b>Status:</b> ${notificationPayload.status}</p>
+          <p><b>Incident ID:</b> ${notificationPayload.incidentId}</p>
+          <p><b>Join War Room:</b> <a href="${notificationPayload.warRoomLink}">${notificationPayload.warRoomLink}</a></p>
           <hr />
           <p style="font-size: 12px; color: #777;">AlertForge Automated System</p>
         </div>
@@ -37,6 +56,7 @@ export const sendIncidentEmail = async ({ to, subject, message, incident, type =
         console.log(`[Email] Incident notification sent successfully to: ${to}`);
     } catch (error) {
         console.error(`[Email] Failed to send incident email to ${to}:`, error.message);
+        throw error;
     }
 };
 
@@ -68,5 +88,6 @@ export const sendInviteEmail = async ({ to, name, temporaryPassword, invitedBy }
         console.log(`[Email] Invitation sent successfully to: ${to}`);
     } catch (error) {
         console.error(`[Email] Failed to send invitation email to ${to}:`, error.message);
+        throw error;
     }
 };
