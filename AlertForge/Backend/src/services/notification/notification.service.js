@@ -1,6 +1,16 @@
 import { sendIncidentEmail } from "./email.service.js";
 import { sendWhatsApp } from "./whatsapp.service.js";
 import { sendTelegramNotification } from "./telegram.service.js";
+import { getTeamMembersDAO, findUserByIdDAO } from "../../dao/user.dao.js";
+
+const formatMessage = (incident) => {
+    const title = incident.title || incident.message || "N/A";
+    const service = incident.service || "N/A";
+    const severity = incident.severity || "N/A";
+    const status = incident.status || "N/A";
+    const incidentId = incident._id?.toString() || incident.id || "N/A";
+    return `🚨 INCIDENT ALERT 🚨\nTitle: ${title}\nService: ${service}\nSeverity: ${severity}\nStatus: ${status}\nIncident ID: ${incidentId}`;
+};
 
 /**
  * Helper to deduplicate arrays and remove falsy values
@@ -24,11 +34,12 @@ export const sendEmailNotifications = async (user, incident, warRoomLink) => {
 
         if (recipients.length === 0) return;
 
+        const msg = formatMessage(incident);
         const emailPromises = recipients.map(email => 
             sendIncidentEmail({
                 to: email,
-                subject: `🚨 AlertForge: ${incident.service} - ${incident.severity.toUpperCase()}`,
-                message: `An incident has been reported.\n\nMessage: ${incident.message}\nService: ${incident.service}\nSeverity: ${incident.severity}\n\nAccess the War Room here:\n${warRoomLink}`.trim()
+                subject: `🚨 INCIDENT ALERT: ${incident.service} - ${incident.severity.toUpperCase()}`,
+                message: `${msg.replace(/\n/g, '<br/>')}<br/><br/>Access the War Room here:<br/><a href="${warRoomLink}">${warRoomLink}</a>`
             })
         );
 
@@ -101,7 +112,8 @@ export const sendDiscordNotifications = async (user, incident, warRoomLink) => {
             return;
         }
 
-        const message = `🚨 Incident Alert\nMessage: ${incident.message}\nService: ${incident.service}\nSeverity: ${incident.severity}\nJoin: ${warRoomLink}`;
+        const msg = formatMessage(incident);
+        const message = `${msg}\n\nJoin War Room: ${warRoomLink}`;
 
         const discordPromises = webhooks.map(url =>
             fetch(url, {
@@ -142,10 +154,39 @@ export const sendIncidentNotifications = async (user, incident) => {
         sendDiscordNotifications(user, incident, warRoomLink),
         // Optional Whatsapp legacy
         user.preferences?.whatsappEnabled && user.whatsappNumber ? sendWhatsApp({
-            message: `${incident.message}. Join War Room: ${warRoomLink}`,
+            message: `${incident.title || incident.message}. Join War Room: ${warRoomLink}`,
             dynamicNumber: user.whatsappNumber
         }) : Promise.resolve()
     ]);
+};
+
+/**
+ * Broadcast an incident alert to all users in an organization
+ */
+export const broadcastIncidentAlert = async (incident, organizationId) => {
+    try {
+        console.log(`[Broadcast] Fetching users for organization: ${organizationId}`);
+        const [adminUser, teamMembers] = await Promise.all([
+            findUserByIdDAO(organizationId),
+            getTeamMembersDAO(organizationId)
+        ]);
+
+        const allUsers = [];
+        if (adminUser) allUsers.push(adminUser);
+        if (teamMembers && teamMembers.length > 0) allUsers.push(...teamMembers);
+
+        if (allUsers.length === 0) {
+            console.warn("[Broadcast] No users found for organization.");
+            return;
+        }
+
+        console.log(`[Broadcast] Initiating notifications for ${allUsers.length} members`);
+        const promises = allUsers.map(user => sendIncidentNotifications(user, incident));
+        
+        await Promise.allSettled(promises);
+    } catch (error) {
+        console.error("[Broadcast] Error broadcasting incident alert:", error);
+    }
 };
 
 /**  

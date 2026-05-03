@@ -19,6 +19,9 @@ incidentRouter.use(smartAuth);
 incidentRouter.use(authApiLimiter);
 
 incidentRouter.post("/", createIncident);
+// Alias route specifically for broadcasting
+incidentRouter.post("/broadcast", createIncident);
+
 incidentRouter.get("/", getAllIncidents);
 incidentRouter.get("/:id", getIncidentById);
 incidentRouter.patch("/:id/status", criticalApiLimiter, updateIncidentStatus);

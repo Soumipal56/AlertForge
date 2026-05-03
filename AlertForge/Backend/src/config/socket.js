@@ -181,6 +181,9 @@ export const initSocket = async (httpServer) => {
             } catch (error) {
                 if (typeof ack === "function") ack({ success: false, message: error.message });
                 emitSocketError(socket, "VALIDATION_ERROR", error.message);
+            }
+        });
+
         socket.on("room:leave", (payload = {}, ack) => {
             const { room } = payload;
             if (room) {
@@ -251,8 +254,9 @@ export const initSocket = async (httpServer) => {
         });
     });
 
-
+    
     return ioInstance;
+
 };
 
 export const getIo = () => ioInstance;

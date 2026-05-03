@@ -16,7 +16,7 @@ import { autoLogTimelineEvent } from "./timeline/timeline.service.js";
 import { TIMELINE_EVENTS } from "../utils/timeline.constants.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "./socket/socket.service.js";
 import { generatePostmortem } from "./postmortem.service.js";
-import { sendIncidentNotifications } from "./notification/notification.service.js";
+import { broadcastIncidentAlert } from "./notification/notification.service.js";
 
 /**  
  * @description Service function to retrieve all incidents from the database with status filtering and counts
@@ -90,8 +90,9 @@ export const createIncidentService = async (data, user, apiKey) => {
     }
 
     // 5. SIDE EFFECTS (Post-commit)
-    if (apiKey.user) sendIncidentNotifications(apiKey.user, incident).catch(console.error);
-    
+    if (user.organizationId) {
+        broadcastIncidentAlert(incident, user.organizationId).catch(console.error);
+    }
     syncServiceStatusFromIncidentsService(incident.service, user.organizationId, apiKey._id).catch(console.error);
 
     emitNewIncident(incident);

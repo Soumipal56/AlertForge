@@ -16,12 +16,12 @@ export const sendTelegramNotification = async (data, dynamicChatId = null, link 
 
     try {
         let message = `
-🚨 *New Incident Created*
-
-📌 *Service:* ${data.service || "N/A"}
-⚡ *Status:* ${data.status || "N/A"}
-🔴 *Severity:* ${data.severity || "N/A"}
-📝 *Message:* ${data.message || "N/A"}
+🚨 *INCIDENT ALERT* 🚨
+*Title:* ${data.title || data.message || "N/A"}
+*Service:* ${data.service || "N/A"}
+*Severity:* ${data.severity || "N/A"}
+*Status:* ${data.status || "N/A"}
+*Incident ID:* ${data._id || data.id || "N/A"}
 `.trim();
 
         if (link) {
