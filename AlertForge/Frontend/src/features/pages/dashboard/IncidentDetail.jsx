@@ -28,9 +28,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { incidentsApi } from "@/api/incidents.api";
 import { postmortemApi } from "@/api/postmortem.api";
-import { normalizeIncident, denormalizeStatus, normalizeStatus } from "@/lib/mapper";
 
 // ─── Style maps ───────────────────────────────────────────────────────────────
 

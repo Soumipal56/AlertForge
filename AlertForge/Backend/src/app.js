@@ -36,7 +36,7 @@ app.use(publicApiLimiter);
 
 //NOTE -  Middleware
 app.use(cors({
-    origin: ["http://localhost:5173", "http://localhost:3000"], // Support both standard React/Vite ports
+    origin: true, // Support both standard React/Vite ports
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
