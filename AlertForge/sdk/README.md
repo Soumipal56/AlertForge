@@ -17,12 +17,10 @@ AlertForge uses a stateless API Key authentication model. You do not need to man
 
 ## 🚀 Installation
 
-> [!NOTE]
-> The SDK is currently in development and **not yet published to npm**. To use it, copy the `sdk` folder into your project and import it locally.
+Install the SDK via npm:
 
 ```bash
-# Don't run this yet!
-# npm install alertforge-sdk
+npm install alertforge-sdk
 ```
 
 ---
@@ -32,7 +30,7 @@ AlertForge uses a stateless API Key authentication model. You do not need to man
 ### Initialization
 
 ```javascript
-import { AlertForge } from "./sdk/index.js"; // Adjust path if local
+import { AlertForge } from "alertforge-sdk";
 
 const af = new AlertForge({
   apiKey: "af_your_secret_key",
@@ -41,9 +39,11 @@ const af = new AlertForge({
 ```
 
 ### ⚠️ IMPORTANT: Setup Notifications First
-Before creating your first incident, you **MUST** update your profile to configure where notifications should be sent. This ensures that when an incident is broadcast, you actually receive the alerts.
+
+Before creating your first incident, you **MUST** update your profile to configure where notifications should be sent. AlertForge uses these settings to determine which channels (Email, Telegram, Discord) to trigger during a broadcast.
 
 ```javascript
+// Step 1: Configure your notification stack
 await af.updateProfile({
   name: "On-Call Engineer",
   teamEmails: ["alerts@company.com"],
@@ -55,6 +55,9 @@ await af.updateProfile({
     telegramEnabled: true
   }
 });
+
+// Step 2: Now you can broadcast incidents safely
+const incident = await af.createIncident({ ... });
 ```
 
 ### Incident Management
