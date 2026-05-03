@@ -3,6 +3,7 @@ import { attachApiKey, authMiddleware } from "../middleware/auth.middleware.js";
 import { authApiLimiter, criticalApiLimiter } from "../middleware/rateLimiter/index.js";
 import { 
     createIncident, 
+    createAndBroadcastIncident,
     getAllIncidents, 
     getIncidentById, 
     updateIncidentStatus, 
@@ -20,7 +21,7 @@ incidentRouter.use(authApiLimiter);
 
 incidentRouter.post("/", createIncident);
 // Alias route specifically for broadcasting
-incidentRouter.post("/broadcast", createIncident);
+incidentRouter.post("/broadcast", createAndBroadcastIncident);
 
 incidentRouter.get("/", getAllIncidents);
 incidentRouter.get("/:id", getIncidentById);

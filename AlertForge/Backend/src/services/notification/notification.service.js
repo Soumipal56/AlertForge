@@ -9,7 +9,11 @@ const formatMessage = (incident) => {
     const severity = incident.severity || "N/A";
     const status = incident.status || "N/A";
     const incidentId = incident._id?.toString() || incident.id || "N/A";
-    return `🚨 INCIDENT ALERT 🚨\nTitle: ${title}\nService: ${service}\nSeverity: ${severity}\nStatus: ${status}\nIncident ID: ${incidentId}`;
+    let message = `🚨 INCIDENT ALERT 🚨\nTitle: ${title}\nService: ${service}\nSeverity: ${severity}\nStatus: ${status}\nIncident ID: ${incidentId}`;
+    if (incident.joinCode) {
+        message += `\nJoin Code: ${incident.joinCode}`;
+    }
+    return message;
 };
 import { sendWebhookNotification } from "./webhook.service.js";
 
@@ -132,7 +136,10 @@ export const sendDiscordNotifications = async (user, incident, warRoomLink, type
  */
 export const sendIncidentNotifications = async (user, incident, type = "INCIDENT_CREATED") => {
     const incidentId = incident._id?.toString() || incident.id;
-    const warRoomLink = `http://localhost:5173/warroom/${incidentId}`;
+    let warRoomLink = `http://localhost:5173/warroom/${incidentId}`;
+    if (incident.joinToken) {
+        warRoomLink += `?token=${incident.joinToken}`;
+    }
 
     console.log("[Notification] Firing notifications for user:", user._id?.toString() || user.id);
 
@@ -144,7 +151,6 @@ export const sendIncidentNotifications = async (user, incident, type = "INCIDENT
         // Optional Whatsapp legacy
         user.preferences?.whatsappEnabled && user.whatsappNumber ? sendWhatsApp({
             message: `${incident.title || incident.message}. Join War Room: ${warRoomLink}`,
-            message: `${incident.message || incident.title}. Join War Room: ${warRoomLink}`,
             dynamicNumber: user.whatsappNumber
         }) : Promise.resolve()
     ]);

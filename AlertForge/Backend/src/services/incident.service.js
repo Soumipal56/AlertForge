@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import appConfig from "../config/appConfig.js";
 import {
     createIncidentDAO,
     getAllIncidentsDAO,
@@ -16,7 +18,7 @@ import { autoLogTimelineEvent } from "./timeline/timeline.service.js";
 import { TIMELINE_EVENTS } from "../utils/timeline.constants.js";
 import { emitIncidentUpdate, emitNewIncident, emitTimelineEvent } from "./socket/socket.service.js";
 import { generatePostmortem } from "./postmortem.service.js";
-import { broadcastIncidentAlert } from "./notification/notification.service.js";
+import { broadcastIncidentAlert, sendIncidentNotification } from "./notification/notification.service.js";
 
 /**  
  * @description Service function to retrieve all incidents from the database with status filtering and counts
@@ -51,7 +53,7 @@ export const getIncidentByIdService = async (id, organizationId) => {
 /**  
  * @description Service function to create a new incident with full orchestration and transaction safety
  */
-export const createIncidentService = async (data, user, apiKey) => {
+export const createIncidentService = async (data, user, apiKey, isBroadcast = false) => {
     const session = await mongoose.startSession();
     let incident;
 
@@ -69,6 +71,12 @@ export const createIncidentService = async (data, user, apiKey) => {
             data.apiKeyId = apiKey._id;
             data.organizationId = user.organizationId;
 
+            data._id = new mongoose.Types.ObjectId();
+
+            if (isBroadcast) {
+                data.joinCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
+                data.joinToken = jwt.sign({ incidentId: data._id.toString(), organizationId: user.organizationId }, appConfig.jwtAccessSecret, { expiresIn: "7d" });
+            }
 
             // 3. Persist to DB
             incident = await createIncidentDAO(data);
@@ -90,7 +98,7 @@ export const createIncidentService = async (data, user, apiKey) => {
     }
 
     // 5. SIDE EFFECTS (Post-commit)
-    if (user.organizationId) {
+    if (isBroadcast && user.organizationId) {
         broadcastIncidentAlert(incident, user.organizationId).catch(console.error);
     }
     sendIncidentNotification({ incident, user, type: "INCIDENT_CREATED" }).catch(console.error);
