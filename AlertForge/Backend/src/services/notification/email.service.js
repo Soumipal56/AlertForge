@@ -168,7 +168,7 @@ export const sendIncidentEmail = async ({
       },
       {
         headers: {
-          "api-key": appConfig.brevoApiKey,
+          "api-key": appConfig.BREVO_API_KEY,
           "Content-Type": "application/json",
         },
       }
@@ -197,6 +197,10 @@ export const sendInviteEmail = async ({
   invitedBy,
 }) => {
   try {
+    if (!appConfig.BREVO_API_KEY || !appConfig.EMAIL_USER) {
+      throw new Error("BREVO_API_KEY and EMAIL_USER are required");
+    }
+
     const htmlContent = `
       <div style="font-family: sans-serif; border: 1px solid #eee; padding: 20px; max-width: 600px;">
         <h2 style="color: #1976d2;">

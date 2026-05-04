@@ -14,6 +14,9 @@ import {
   Radio,
 } from "lucide-react";
 import { statusApi } from "@/api/status.api";
+import { useAuth } from "@/hooks/useAuth";
+import { normalizeIncident } from "@/services/incidents.service";
+import { normalizeService } from "@/lib/mapper";
 
 const serviceStatusConfig = {
   operational: { dot: "bg-emerald-500", label: "Operational", labelClass: "text-emerald-400", barColor: "bg-emerald-700/80 hover:bg-emerald-500" },

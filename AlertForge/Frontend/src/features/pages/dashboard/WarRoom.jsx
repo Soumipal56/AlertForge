@@ -20,6 +20,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useWarRoom } from "@/hooks/useWarRoom";
 
 
 // ─── Style maps ───────────────────────────────────────────────────────────────
