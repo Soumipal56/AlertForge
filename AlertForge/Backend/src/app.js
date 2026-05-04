@@ -33,7 +33,11 @@ const app = express();
 // SECURITY HARDENING
 app.use(helmet());
 app.use(cors({
-    origin: ["http://localhost:5173", "https://alertforge.onrender.com"],
+    origin: [
+        "http://localhost:5173",
+        "https://alertforge.onrender.com",        // ✅ your frontend
+        "https://alertforge-api.onrender.com",    // ✅ your backend (if needed)
+    ],
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
@@ -78,12 +82,27 @@ app.use(`/api`, uploadRouter);
 // LEGACY COMPAT
 app.use(`/postmortem`, postmortemRouter);
 
+// HEALTH CHECK
+app.get("/", (req, res) => {
+    res.status(200).json({
+        status: "ok",
+        service: "AlertForge API",
+        version: "1.0.0",
+        environment: process.env.NODE_ENV || "development",
+        timestamp: new Date().toISOString(),
+    });
+});
+
 // SPA HANDLER
-app.get("/*path", (req, res, next) => {
+app.get("*", (req, res, next) => {
     if (req.url.startsWith("/api") || req.url.startsWith("/socket.io")) {
         return next();
     }
-    res.sendFile(path.join(__dirname, "../public/index.html"));
+    // ✅ Don't try to serve frontend files from backend
+    res.status(404).json({
+        status: "error",
+        message: `Route ${req.method} ${req.url} not found`,
+    });
 });
 
 // ERROR HANDLING
