@@ -1,6 +1,7 @@
 import { createIncidentService } from "../services/incident.service.js";
-import { hashKey } from "../utils/hashKey.js";
-import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
+import { extractKeyId } from "../utils/hashKey.js";
+import { findActiveApiKeyByKeyIdDAO } from "../dao/apikey.dao.js";
+import bcrypt from "bcryptjs";
 import ApiResponse from "../utils/ApiResponse.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
@@ -16,10 +17,15 @@ export const uptimerobotWebhook = async (req, res, next) => {
             return res.status(HTTP_STATUS.UNAUTHORIZED).json(new ApiResponse(HTTP_STATUS.UNAUTHORIZED, "API Key is required in query params"));
         }
 
-        const hashedKey = hashKey(apiKey);
-        const apiKeyDoc = await findActiveApiKeyByHashedKeyDAO(hashedKey);
+        const keyId = extractKeyId(apiKey);
+        const apiKeyDoc = await findActiveApiKeyByKeyIdDAO(keyId);
 
         if (!apiKeyDoc) {
+            return res.status(HTTP_STATUS.UNAUTHORIZED).json(new ApiResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API Key"));
+        }
+
+        const isMatch = await bcrypt.compare(apiKey, apiKeyDoc.hashedKey);
+        if (!isMatch) {
             return res.status(HTTP_STATUS.UNAUTHORIZED).json(new ApiResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API Key"));
         }
 

@@ -15,6 +15,16 @@ export const findActiveApiKeyByKeyIdDAO = async (keyId) => {
         .lean();
 };
 
+export const findActiveApiKeyByHashedKeyDAO = async (hashedKey) => {
+    return await apiKeyModel
+        .findOne({
+            hashedKey: hashedKey,
+            isActive: true,
+        })
+        .populate("user")
+        .lean();
+};
+
 export const findActiveApiKeyByUserDAO = async (userId) => {
     return await apiKeyModel
         .findOne({
