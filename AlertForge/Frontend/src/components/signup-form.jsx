@@ -49,8 +49,11 @@ export function SignupForm({ ...props }) {
   };
 
   const handleGoogleSignup = () => {
-    // const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-    window.location.href = `https://alertforge.onrender.com/api/auth/google`;
+    const apiUrl =
+      import.meta.env.VITE_API_URL ||
+      import.meta.env.VITE_API_BASE_URL ||
+      "http://localhost:3000";
+    window.location.href = `${apiUrl}/api/auth/google`;
   };
 
   const handleChange = (field) => (e) => {

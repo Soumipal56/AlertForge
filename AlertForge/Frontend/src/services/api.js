@@ -21,6 +21,6 @@ export const authApi = {
       import.meta.env.VITE_API_BASE_URL ||
       import.meta.env.VITE_API_URL ||
       "http://localhost:3000";
-    return `${BASE_URL}/auth/google`;
+    return `${BASE_URL}/api/auth/google`;
   },
 };
