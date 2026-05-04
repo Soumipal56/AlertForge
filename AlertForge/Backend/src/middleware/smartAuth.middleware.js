@@ -9,6 +9,8 @@ import { extractKeyId } from "../utils/hashKey.js";
 import bcrypt from "bcryptjs";
 import logger from "../utils/logger.js";
 
+import { findUserByIdDAO } from "../dao/user.dao.js";
+
 export const smartAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers["authorization"];
@@ -48,31 +50,38 @@ export const smartAuth = async (req, res, next) => {
 
     // CASE 2: NORMAL LOGIN FLOW (Dashboard)
     if (accessToken) {
-        const decoded = verifyAccessToken(accessToken);
-        if (!decoded?.userId) {
-            throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.INVALID_TOKEN, 'INVALID_TOKEN');
-        }
+      const decoded = verifyAccessToken(accessToken);
+      if (!decoded?.userId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.INVALID_TOKEN, 'INVALID_TOKEN');
+      }
 
-        const apiKey = await findActiveApiKeyByUserDAO(decoded.userId);
-        if (!apiKey || !apiKey.user) {
-            throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User or API Key not found", 'USER_NOT_FOUND');
-        }
+      const user = await findUserByIdDAO(decoded.userId);
+      if (!user) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User not found", 'USER_NOT_FOUND');
+      }
 
-        req.apiKey = apiKey;
-        req.apiKeyId = apiKey._id;
-        req.user = {
-            id: apiKey.user._id,
-            email: apiKey.user.email,
-            role: apiKey.user.role,
-            organizationId: apiKey.user.organizationId || apiKey.user._id,
-            name: apiKey.user.name
-        };
+      req.user = {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        organizationId: user.organizationId || user._id,
+        name: user.name
+      };
 
-        return next();
+      return next();
     }
 
     throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized access - No valid session or API Key found", 'UNAUTHORIZED');
   } catch (error) {
     next(error);
   }
+};
+
+export const softAuth = (req, res, next) => {
+  smartAuth(req, res, (err) => {
+    if (err) {
+      req.user = null;
+    }
+    next();
+  });
 };

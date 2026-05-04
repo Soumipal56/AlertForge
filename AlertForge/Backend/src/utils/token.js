@@ -11,21 +11,10 @@ const assertSecret = (secret, name) => {
 export const generateAccessToken = (userId) => {
     assertSecret(appConfig.jwtAccessSecret, "JWT_ACCESS_SECRET");
     const jti = crypto.randomBytes(16).toString("hex");
-    return jwt.sign({ userId, jti }, appConfig.jwtAccessSecret, { expiresIn: "15m" });
-};
-
-export const generateRefreshToken = (userId) => {
-    assertSecret(appConfig.jwtRefreshSecret, "JWT_REFRESH_SECRET");
-    const jti = crypto.randomBytes(16).toString("hex");
-    return jwt.sign({ userId, jti }, appConfig.jwtRefreshSecret, { expiresIn: "7d" });
+    return jwt.sign({ userId, jti }, appConfig.jwtAccessSecret, { expiresIn: "7d" });
 };
 
 export const verifyAccessToken = (token) => {
     assertSecret(appConfig.jwtAccessSecret, "JWT_ACCESS_SECRET");
     return jwt.verify(token, appConfig.jwtAccessSecret);
-};
-
-export const verifyRefreshToken = (token) => {
-    assertSecret(appConfig.jwtRefreshSecret, "JWT_REFRESH_SECRET");
-    return jwt.verify(token, appConfig.jwtRefreshSecret);
 };

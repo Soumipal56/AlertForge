@@ -28,7 +28,7 @@ export const loginThunk = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message ||
-          "Login failed. Please check your credentials.",
+        "Login failed. Please check your credentials.",
       );
     }
   },
@@ -130,7 +130,7 @@ const authSlice = createSlice({
       .addCase(getMeThunk.fulfilled, (state, action) => {
         state.isFetching = false;
         state.user = action.payload;
-        state.isAuthenticated = true;
+        state.isAuthenticated = !!action.payload;
       })
       .addCase(getMeThunk.rejected, (state) => {
         state.isFetching = false;
@@ -146,7 +146,7 @@ const authSlice = createSlice({
       .addCase(loginThunk.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload;
-        state.isAuthenticated = true;
+        state.isAuthenticated = !!action.payload;
       })
       .addCase(loginThunk.rejected, (state, action) => {
         state.isLoading = false;
@@ -161,7 +161,7 @@ const authSlice = createSlice({
       .addCase(registerThunk.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
-        state.isAuthenticated = true;
+        state.isAuthenticated = !!action.payload.user;
         state.apiKey = action.payload.apiKey;
       })
       .addCase(registerThunk.rejected, (state, action) => {

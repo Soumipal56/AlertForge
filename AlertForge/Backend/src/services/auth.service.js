@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import ApiError from "../utils/ApiError.js";
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/token.js";
+import { generateAccessToken } from "../utils/token.js";
 import { ERROR_MESSAGES, HTTP_STATUS } from "../config/constants.js";
 import { createUserDAO, findUserByEmailDAO, findUserByEmailWithPasswordDAO, findUserByIdDAO, updateUserByIdDAO } from "../dao/user.dao.js";
 import { createApiKeyService } from "./apikey.service.js";
@@ -44,12 +44,8 @@ export const registerService = async ({ email, password }) => {
     }
 
     const rawApiKey = generateApiKey();
-    const hashed = await hashKey(rawApiKey);
-    const keyId = rawApiKey.split('.')[0] || rawApiKey.slice(0, 8); // Same logic as extractKeyId
-
     await createApiKeyService({
-        keyId: keyId,
-        hashedKey: hashed,
+        key: hashKey(rawApiKey),
         user: user._id,
         isActive: true,
     });
@@ -59,7 +55,6 @@ export const registerService = async ({ email, password }) => {
     return {
         apiKey: rawApiKey,
         accessToken: generateAccessToken(userId),
-        refreshToken: generateRefreshToken(userId),
     };
 };
 
@@ -89,7 +84,6 @@ export const loginService = async ({ email, password }) => {
             email: user.email,
         },
         accessToken: generateAccessToken(userId),
-        refreshToken: generateRefreshToken(userId),
     };
 };
 
@@ -149,22 +143,4 @@ export const loginWithGoogle = async ({ googleId, email, name, avatar }) => {
 };
 
 
-export const refreshAccessTokenService = async (refreshToken) => {
-    if (!refreshToken) {
-        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.UNAUTHORIZED);
-    }
 
-    let decoded;
-    try {
-        decoded = verifyRefreshToken(refreshToken);
-    } catch (error) {
-        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.INVALID_TOKEN);
-    }
-
-    const user = await findUserByIdDAO(decoded.userId);
-    if (!user) {
-        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, ERROR_MESSAGES.AUTH.INVALID_TOKEN);
-    }
-
-    return generateAccessToken(user._id.toString());
-};

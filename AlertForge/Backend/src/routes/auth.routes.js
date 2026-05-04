@@ -1,15 +1,14 @@
 import { Router } from "express";
 import passport from "passport";
-import { login, logout, refresh, register, googleCallback, getMe } from "../controller/auth.controller.js";
-import { smartAuth } from "../middleware/smartAuth.middleware.js";
+import { login, logout, register, googleCallback, getMe } from "../controller/auth.controller.js";
+import { smartAuth, softAuth } from "../middleware/smartAuth.middleware.js";
 
 const authRouter = Router();
 
 authRouter.post("/register", register);
 authRouter.post("/login", login);
-authRouter.post("/refresh", refresh);
 authRouter.post("/logout", logout);
-authRouter.get("/me", smartAuth, getMe);
+authRouter.get("/me", softAuth, getMe);
 
 
 // Google OAuth 2.0 routes

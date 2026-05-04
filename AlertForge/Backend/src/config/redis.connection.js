@@ -24,15 +24,28 @@ export const getRedisClient = async () => {
             },
             // Additional stability options
             retryStrategy: (times) => {
-                const delay = Math.min(times * 50, 2000);
+                const delay = Math.min(times * 100, 3000);
                 return delay;
             },
-            maxRetriesPerRequest: null, // Keep retrying
-            enableReadyCheck: true
+            maxRetriesPerRequest: null,
+            enableReadyCheck: true,
+            connectTimeout: 10000,
+            keepAlive: 10000, // Keep connection alive (Upstash timeout fix)
+            reconnectOnError: (err) => {
+                const targetError = "READONLY";
+                if (err.message.includes(targetError) || err.message.includes("ECONNRESET")) {
+                    return true; // Reconnect on these errors
+                }
+                return false;
+            }
         });
 
         redisClient.on("error", (err) => {
-            console.error("[Redis Shared] Error:", err.message);
+            if (err.message.includes("ECONNRESET")) {
+                console.warn("[Redis Shared] Connection reset by peer. Reconnecting...");
+            } else {
+                console.error("[Redis Shared] Error:", err.message);
+            }
         });
 
         redisClient.on("connect", () => {
