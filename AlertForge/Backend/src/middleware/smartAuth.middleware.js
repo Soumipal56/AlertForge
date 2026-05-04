@@ -60,6 +60,13 @@ export const smartAuth = async (req, res, next) => {
         throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User not found", 'USER_NOT_FOUND');
       }
 
+      // Try to fetch an active API key for this user (not mandatory for dashboard)
+      const apiKey = await findActiveApiKeyByUserDAO(user._id);
+      if (apiKey) {
+        req.apiKey = apiKey;
+        req.apiKeyId = apiKey._id;
+      }
+
       req.user = {
         id: user._id,
         email: user.email,

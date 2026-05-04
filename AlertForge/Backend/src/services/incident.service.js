@@ -68,7 +68,7 @@ export const createIncidentService = async (data, user, apiKey, isBroadcast = fa
             data.responders = user?.id ? [user.id] : [];
             data.status = data.status || INCIDENT_STATUS.INVESTIGATING;
             data.severity = data.severity || SEVERITY.P3;
-            data.apiKeyId = apiKey._id;
+            data.apiKeyId = apiKey?._id || null;
             data.organizationId = organizationId;
 
             data._id = new mongoose.Types.ObjectId();
@@ -87,7 +87,7 @@ export const createIncidentService = async (data, user, apiKey, isBroadcast = fa
             // 5. Timeline Log
             await autoLogTimelineEvent({
                 incidentId: incident._id,
-                apiKeyId: apiKey._id,
+                apiKeyId: apiKey?._id || null,
                 type: TIMELINE_EVENTS.INCIDENT_CREATED,
                 message: `Incident created: ${incident.title}`,
                 user
@@ -104,7 +104,7 @@ export const createIncidentService = async (data, user, apiKey, isBroadcast = fa
         await sendIncidentNotification({ incident, user, type: "INCIDENT_CREATED" });
     }
 
-    syncServiceStatusFromIncidentsService(incident.service, organizationId, apiKey._id).catch(console.error);
+    syncServiceStatusFromIncidentsService(incident.service, organizationId, apiKey?._id || null).catch(console.error);
 
     emitNewIncident(incident);
     emitTimelineEvent({

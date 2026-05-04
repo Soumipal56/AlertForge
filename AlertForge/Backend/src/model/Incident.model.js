@@ -68,7 +68,8 @@ const incidentSchema = new mongoose.Schema({
     apiKeyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "ApiKey",
-        required: true,
+        required: false,
+        default: null,
         index: true,
     },
     organizationId: {

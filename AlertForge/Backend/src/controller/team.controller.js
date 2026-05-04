@@ -41,8 +41,8 @@ export const inviteTeamMember = async (req, res, next) => {
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, "Email is required");
         }
 
-        // Check for duplicate email
-        const existing = await findUserByEmailDAO(email);
+        // Check for duplicate email across the entire system
+        const existing = await findUserByEmailDAO(email.trim().toLowerCase());
         if (existing) {
             throw new ApiError(HTTP_STATUS.BAD_REQUEST, "A user with this email already exists");
         }
@@ -50,23 +50,21 @@ export const inviteTeamMember = async (req, res, next) => {
         const validRoles = ["responder", "viewer"];
         const memberRole = validRoles.includes(role) ? role : "responder";
 
-        // Default password if not provided
+        // Default password if not provided — hashing is handled by User.model.js pre-save hook
         const finalPassword = password || "AlertForge123!";
         // Default name to email prefix if not provided
         const finalName = name || email.split("@")[0];
 
-        const hashedPassword = await bcrypt.hash(finalPassword, 12);
         const member = await createUserDAO({
             name: finalName,
             email: email.trim().toLowerCase(),
-            emailAddress: email.trim().toLowerCase(),
-            password: hashedPassword,
+            password: finalPassword, // Model will hash this
             role: memberRole,
             organizationId,
         });
 
         // Fetch inviter's name for a personalized email
-        const inviter = await findUserByIdDAO(organizationId);
+        const inviter = await findUserByIdDAO(req.user.id);
         const inviterName = inviter?.name || "Your Team Lead";
 
         // Send invitation email asynchronously
@@ -87,6 +85,10 @@ export const inviteTeamMember = async (req, res, next) => {
             })
         );
     } catch (error) {
+        // If it's a Mongoose validation error, return 400
+        if (error.name === "ValidationError") {
+            return next(new ApiError(HTTP_STATUS.BAD_REQUEST, error.message));
+        }
         next(error);
     }
 };
@@ -181,7 +183,7 @@ export const revokeInvite = async (req, res, next) => {
     try {
         const { email } = req.params;
         const user = await findUserByEmailDAO(email);
-        
+
         if (!user) throw new ApiError(HTTP_STATUS.NOT_FOUND, "Invitation not found");
         if (user.organizationId.toString() !== req.user.organizationId.toString()) {
             throw new ApiError(HTTP_STATUS.FORBIDDEN, "Unauthorized to revoke this invitation");

@@ -132,8 +132,9 @@ export const updateIncidentStatus = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     const normalizedStatus = typeof status === "string" ? status.trim().toLowerCase() : "";
+    const apiKeyId = req.apiKey?._id ?? null;
 
-    const updated = await updateIncidentStatusService(id, req.user.organizationId, req.apiKey._id, normalizedStatus, req.user);
+    const updated = await updateIncidentStatusService(id, req.user.organizationId, apiKeyId, normalizedStatus, req.user);
 
     return res.json(new ApiResponse(HTTP_STATUS.OK, "Incident status updated", updated));
 });
@@ -145,8 +146,9 @@ export const updateIncidentSeverity = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { severity } = req.body;
     const normalizedSeverity = typeof severity === "string" ? severity.trim().toUpperCase() : "";
+    const apiKeyId = req.apiKey?._id ?? null;
 
-    const updated = await updateIncidentSeverityService(id, req.user.organizationId, req.apiKey._id, normalizedSeverity, req.user);
+    const updated = await updateIncidentSeverityService(id, req.user.organizationId, apiKeyId, normalizedSeverity, req.user);
 
     return res.json(new ApiResponse(HTTP_STATUS.OK, "Incident severity updated", updated));
 });

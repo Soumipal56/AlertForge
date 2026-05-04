@@ -253,12 +253,12 @@ export function Overview() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-zinc-300">Service / Team</label>
+              <label className="text-sm text-zinc-300">Service</label>
               <Input
                 value={form.team}
                 onChange={(e) => handleFormChange("team", e.target.value)}
                 className="border-zinc-700 bg-zinc-900 text-zinc-100"
-                placeholder="api.acme.com"
+                placeholder="Select or enter a service name"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">

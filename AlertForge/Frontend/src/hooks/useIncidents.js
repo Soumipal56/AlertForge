@@ -78,6 +78,7 @@ export function useIncidents() {
         title: form.incident,
         service: form.team,
         severity: form.severity,
+        status: form.status.toLowerCase(),
       }),
     );
     if (createIncidentThunk.fulfilled.match(result)) {
@@ -87,7 +88,7 @@ export function useIncidents() {
   };
 
   const handleUpdateStatus = (id, status) => {
-    dispatch(updateIncidentStatusThunk({ id, status }));
+    dispatch(updateIncidentStatusThunk({ id, status: status.toLowerCase() }));
   };
 
   const handleUpdateSeverity = (id, severity) => {

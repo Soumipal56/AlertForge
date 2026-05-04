@@ -20,9 +20,9 @@ export const fetchIncidentsThunk = createAsyncThunk(
 /** Create a new incident */
 export const createIncidentThunk = createAsyncThunk(
   "incidents/create",
-  async ({ title, service, severity }, { rejectWithValue }) => {
+  async ({ title, service, severity, status }, { rejectWithValue }) => {
     try {
-      const data = await incidentApi.create({ title, service, severity });
+      const data = await incidentApi.create({ title, service, severity, status });
       const raw = data.incident ?? data;
       return normalizeIncident(raw);
     } catch (err) {
