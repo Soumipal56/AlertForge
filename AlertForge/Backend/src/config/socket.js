@@ -1,8 +1,9 @@
 import { Server } from "socket.io";
-import { findActiveApiKeyByHashedKeyDAO } from "../dao/apikey.dao.js";
+import { findActiveApiKeyByKeyIdDAO } from "../dao/apikey.dao.js";
 import { findUserByIdDAO } from "../dao/user.dao.js";
 import { verifyAccessToken } from "../utils/token.js";
-import { hashKey } from "../utils/hashKey.js";
+import { extractKeyId } from "../utils/hashKey.js";
+import bcrypt from "bcryptjs";
 import {
     getRecentWarRoomMessages,
     resolveWarRoomIdFromApiKey,
@@ -73,11 +74,16 @@ export const initSocket = async (httpServer) => {
             const { apiKey, token, name } = socket.handshake.auth;
 
             if (apiKey) {
-                const hashed = hashKey(apiKey);
-                const foundKey = await findActiveApiKeyByHashedKeyDAO(hashed);
+                const keyId = extractKeyId(apiKey);
+                const foundKey = await findActiveApiKeyByKeyIdDAO(keyId);
 
                 if (!foundKey) {
                     return next(new Error("Unauthorized: Invalid or inactive API Key"));
+                }
+
+                const isMatch = await bcrypt.compare(apiKey, foundKey.hashedKey);
+                if (!isMatch) {
+                    return next(new Error("Unauthorized: Invalid API Key"));
                 }
 
                 socket.user = {
