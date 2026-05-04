@@ -79,7 +79,7 @@ app.use(`/api`, uploadRouter);
 app.use(`/postmortem`, postmortemRouter);
 
 // SPA HANDLER
-app.get("*", (req, res, next) => {
+app.get("/*path", (req, res, next) => {
     if (req.url.startsWith("/api") || req.url.startsWith("/socket.io")) {
         return next();
     }
