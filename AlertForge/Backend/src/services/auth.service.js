@@ -44,8 +44,12 @@ export const registerService = async ({ email, password }) => {
     }
 
     const rawApiKey = generateApiKey();
+    const hashed = await hashKey(rawApiKey);
+    const keyId = rawApiKey.split('.')[0] || rawApiKey.slice(0, 8); // Same logic as extractKeyId
+
     await createApiKeyService({
-        key: hashKey(rawApiKey),
+        keyId: keyId,
+        hashedKey: hashed,
         user: user._id,
         isActive: true,
     });
