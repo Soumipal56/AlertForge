@@ -1,10 +1,9 @@
 import axios from "axios";
 
-export const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   withCredentials: true, // sends HttpOnly cookies on every request — this IS the auth
   headers: { "Content-Type": "application/json" },
 });
@@ -43,7 +42,7 @@ apiClient.interceptors.response.use(
 
       try {
         await axios.post(
-          `${BASE_URL}/api/auth/refresh`,
+          `${API_BASE_URL}/api/auth/refresh`,
           {},
           { withCredentials: true },
         );
