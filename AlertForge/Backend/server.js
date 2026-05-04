@@ -20,9 +20,10 @@ const startServer = async () => {
         await initSocket(httpServer);
 
         // 3. Port Handling (Env-first for Render/Heroku compatibility)
-        const PORT = appConfig.port || process.env.PORT || 3000;
+        const PORT = process.env.PORT || appConfig.port || 3000;
 
-        const server = httpServer.listen(PORT, () => {
+        // ✅ Bind to 0.0.0.0 so Render can detect the open port
+        const server = httpServer.listen(PORT, "0.0.0.0", () => {
             console.log(`[Server] Status: Online`);
             console.log(`[Server] Environment: ${process.env.NODE_ENV || "development"}`);
             console.log(`[Server] Listening on port: ${PORT}`);
@@ -78,11 +79,8 @@ const startServer = async () => {
     }
 };
 
-// Prevent multiple instances if script is required elsewhere
 if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
     startServer();
 } else {
-    // Standard execution for ESM modules in Node
     startServer();
 }
-
