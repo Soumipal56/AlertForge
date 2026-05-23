@@ -134,7 +134,7 @@ Distributed under the ISC License. See `LICENSE` for more information.
 ---
 
 <div align="center">
-Built with ❤️ for the Hackathon by <b>Team AlertForge</b>
+Built with ❤️ for the Hackathon by <b>Team CodeBlooded</b>
 <br/>
 <i>"Forging the future of SRE tools."</i>
 </div>
